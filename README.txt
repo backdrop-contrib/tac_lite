@@ -17,7 +17,7 @@ Here are some key features of tac_lite:
 
 * Designed to be as simple as possible in installation and administration.  
 
-* Leverages Drupal's node_access table, db_rewrite_sql hook and
+* Uses Drupal's node_access table, db_rewrite_sql hook and
   taxonomy module to leave the smallest possible footprint while doing
   it's job.  For example, it introduces no new database tables.
 
