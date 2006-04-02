@@ -292,14 +292,19 @@ function _tac_lite_node_delete(&$node) {
 		   'tac_lite');
 }
 
-/** Return the term ids of terms this user is allowed to access
+/**
+ * Return the term ids of terms this user is allowed to access
+ * 
+ * Users are granted access to terms either because of who they are,
+ * or because of the roles they have.
  */
 function _tac_lite_user_tids(&$account) {
   $grants = array();
   if (count($account->tac_lite)) {
 	// $account->tac_lite is array.  Keys are vids, values are array of tids within that vocabulary, to which the user has access
 	foreach ($account->tac_lite as $tids) {
-	  $grants = array_merge($grants, $tids);
+	  if (count($tids))
+		$grants = array_merge($grants, $tids);
 	}
   }
 
@@ -308,7 +313,8 @@ function _tac_lite_user_tids(&$account) {
   foreach ($account->roles as $rid => $role_name) {
 	if (count($defaults[$rid])) {
 	  foreach ($defaults[$rid] as $tids) {
-		$grants = array_merge($grants, $tids);
+		if (count($tids))
+		  $grants = array_merge($grants, $tids);
 	  }
 	}
   }
