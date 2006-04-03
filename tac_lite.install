@@ -1,0 +1,26 @@
+<?php
+// $Id$
+/**
+ * Implementation of hook_install()
+ * 
+ * We want to set our weight to ensure we are invoked after other
+ * modules that may affect taxonomy (including taxonomy.module).
+ * 
+ * Chose weight of 9 to come after most modules.  Reasonable choice?
+ */
+function tac_lite_install() {
+  // New module weights in core: put this module at end of chain.
+  $ret[] = db_query("UPDATE {system} SET weight = 9 WHERE name = 'tac_lite'");
+  return $ret;
+}
+
+/**
+ * For already installed instances where hook_install was not called
+ */
+function tac_lite_update_1() {
+  $ret[] = update_sql("UPDATE {system} SET weight = 9 WHERE name = 'tac_lite'");
+  return $ret;
+}
+
+
+?>
