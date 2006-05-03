@@ -50,7 +50,7 @@ function tac_lite_menu($may_cache) {
   if ($may_cache) {
 	$items[] = array('path' => 'admin/access/tac_lite', 
 					 'title' => t('tac_lite'),
-					 'callback' => 'tac_lite_settings',
+					 'callback' => 'tac_lite_admin_setttings',
 					 'type' => MENU_LOCAL_TASK,
 					 'weight' => 1, // after 'roles' tab
 					 'access' => $admin_access);
@@ -61,7 +61,7 @@ function tac_lite_menu($may_cache) {
 					 );
 	$items[] = array('path' => 'admin/access/tac_lite/roles',
 					 'title' => t('tac_lite access by role'),
-					 'callback' => 'tac_lite_settings_defaults', 
+					 'callback' => 'tac_lite_admin_setttings_defaults', 
 					 'type' => MENU_LOCAL_TASK,
 					 'access' => $admin_access);					 
   }
@@ -69,8 +69,12 @@ function tac_lite_menu($may_cache) {
   return $items;
 }
 
-function tac_lite_settings() {
+function tac_lite_admin_setttings() {
   $vocabularies = taxonomy_get_vocabularies();
+
+  if (!count($vocabularies)) {
+	return t('You must create a vocabulary before you can use tac_lite.');
+  }
 
   foreach ($vocabularies as $vid => $vocab) {
 	$options[$vid] = $vocab->name;
@@ -85,10 +89,10 @@ function tac_lite_settings() {
 		   '#multiple' => true,
 		   );
 
-  return system_settings_form('tac_lite_settings', $form);
+  return system_settings_form('tac_lite_admin_setttings', $form);
 }
 
-function tac_lite_settings_defaults() {
+function tac_lite_admin_setttings_defaults() {
   $vids = variable_get('tac_lite_categories', null);
   $roles = user_roles();
 
@@ -117,7 +121,8 @@ function tac_lite_settings_defaults() {
 	  }
 	}
 	$output .= '<p>'.t('For each role below, select the terms which members of the role are allowed to view.')."</p>\n";
-	$output .= system_settings_form('tac_lite_settings_defaults', $form);
+	$output .= '<p>'.t('You may grant individual users additional access to specific terms.  See the tac_lite tab when editing user accounts.')."</p>\n";
+	$output .= system_settings_form('tac_lite_admin_setttings_defaults', $form);
 	return $output;
   }
   else {
