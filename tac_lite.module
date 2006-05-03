@@ -85,7 +85,7 @@ function tac_lite_admin_setttings() {
 		   '#title' => 'Vocabularies',
 		   '#default_value' => variable_get('tac_lite_categories', null),
 		   '#options' => $options,
-		   '#description' => t(''),
+		   '#description' => t('Select one or more vocabularies to control privacy.  Do not select free tagging vocabularies, they are not supported.'),
 		   '#multiple' => true,
 		   );
 
@@ -273,8 +273,12 @@ function _tac_lite_get_terms(&$node) {
 	foreach ($node->taxonomy as $term) {
 	  if (is_array($term)) {
 		foreach ($term as $tid) {
-		  if ($tid) {
+		  if (is_numeric($tid)) {
 			$tids[$tid] = $tid;
+		  }
+		  else {
+			// non-numeric means free-tagging vocabulary.
+			// we do not support.  Do nothing.
 		  }
 		}
 	  }
