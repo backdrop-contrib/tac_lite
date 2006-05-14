@@ -81,7 +81,7 @@ Associate the vocabulary with node types, as you would normally do.
 
 Add several terms to that category.
 
-Go to administer >> settings >> tac_lite.
+Go to administer >> access control >> tac_lite.
 
 Select the category you created in the earlier step ("Private Projects").
 
