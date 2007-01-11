@@ -3,24 +3,35 @@
 /**
  * Implementation of hook_install()
  * 
- * We want to set our weight to ensure we are invoked after other
- * modules that may affect taxonomy (including taxonomy.module).
- * 
- * Chose weight of 9 to come after most modules.  Reasonable choice?
+ * This function modifies the database as needed when tac_lite is installed.
  */
 function tac_lite_install() {
-  // New module weights in core: put this module at end of chain.
-  $ret[] = db_query("UPDATE {system} SET weight = 9 WHERE name = 'tac_lite'");
-  return $ret;
+  // Ensure we come after taxonomy.
+  db_query("UPDATE {system} SET weight = 9 WHERE name = 'tac_lite'");
+
+  // Note that it is not necessary to rebuild the node access table here, as
+  // that will be done when module settings are saved.
 }
 
 /**
- * For already installed instances where hook_install was not called
+ * Ensure that tac_lite hooks are invoked after taxonomy module hooks.
  */
 function tac_lite_update_1() {
   $ret[] = update_sql("UPDATE {system} SET weight = 9 WHERE name = 'tac_lite'");
   return $ret;
 }
 
+/**
+ * Ensure that the node_access table is thoroughly cleaned up.
+ */
+function tac_lite_update_2() {
+  $ret = array();
+  // node_access_rebuild function introduced in drupal 5 will ensure that the node_access
+  // table is correct.
+  node_access_rebuild();
+  $ret[] = array('success' => TRUE, // assume success
+               'query' => t('Rebuilt node access table for tac_lite module.'));
+  return $ret;
+}
 
 ?>

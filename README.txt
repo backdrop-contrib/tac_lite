@@ -58,8 +58,6 @@ see.
 INSTALL
 -------
 
-For drupal 4.7.
-
 Enable taxonomy module.  It's required.
 
 Install this package the normal way.
@@ -75,17 +73,17 @@ Log in as an administrator. (uid==1, or a user with
 administer_tac_lite permission)
 
 Create a vocabulary which you will use to categorize private nodes.
-You may want to call this "Private Projects".
+You may want to create a vocabulary called "Privacy" with terms like
+"public", "private", and "administers only".
 
 Associate the vocabulary with node types, as you would normally do.
 
-Add several terms to that category.
+Go to administer >> user management >> access control >> access
+control by taxonomy.
 
-Go to administer >> access control >> tac_lite.
+Select the category you created in the earlier step ("Privacy").
 
-Select the category you created in the earlier step ("Private Projects").
-
-Create some content.  Choose a node type associated with "Private Projects".
+Create some content.  Choose a node type you've associated with "Privacy".
 
 Note that you can view the content you just created.  Other users cannot.
 
@@ -96,29 +94,14 @@ Select a term you selected when creating the node and submit changes.
 Now the user can also access the node you created.
 
 
-IMPORTANT NOTE
---------------
+NOTES
+-----
 
-If you have no access_control modules installed, when you first
-install this module it will hide all existing content from most users
-(except uid==1).  This has to do with the way Drupal's node_access
-table works.  To make nodes visible, you have to re-save them
-(i.e. edit the node and simply hit submit without changing anything).
-This will cause the appropriate entries to be written to the
-node_access table.  Of course, there should be a way to automate this
-process.  Any volunteers?
+If behavior of this or any other access control module seems to be incorrect, try rebuilding the node access table. This may be done under administer >> content management >> post settings.  There is a button there labelled "rebuild permissions"
 
-RELATED MODULES
----------------
-
-There is a sister module called cac_access which is nearly identical,
-but uses the new Category module instead of the taxonomy module.  You
-could theoretically install taxonomy, category, tac_lite and cac_lite
-at the same time.  But you probably do not want to.
-
-There is a sub-module of the devel module, called devel_node_access
-which can give you some insight into the contents of your node_access
-table.  Recommended for troubleshooting.
+Another useful tool is a sub-module of the devel module, called
+devel_node_access which can give you some insight into the contents of
+your node_access table.  Recommended for troubleshooting.
 
 
 AUTHOR
