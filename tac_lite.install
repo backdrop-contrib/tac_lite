@@ -34,4 +34,14 @@ function tac_lite_update_2() {
   return $ret;
 }
 
+/**
+ * Introducing schemes.  Rename tac_lite_default_grants to tac_lite_grants_scheme_1.
+ */
+function tac_lite_update_3() {
+  $ret = array();
+  $ret[] = update_sql("UPDATE {variable} SET name='tac_lite_grants_scheme_1' WHERE name='tac_lite_default_grants'");
+  return $ret;
+}
+
+
 ?>

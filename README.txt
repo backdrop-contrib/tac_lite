@@ -97,7 +97,10 @@ Now the user can also access the node you created.
 NOTES
 -----
 
-If behavior of this or any other access control module seems to be incorrect, try rebuilding the node access table. This may be done under administer >> content management >> post settings.  There is a button there labelled "rebuild permissions"
+If behavior of this or any other access control module seems to be
+incorrect, try rebuilding the node access table. This may be done
+under administer >> content management >> post settings.  There is a
+button there labelled "rebuild permissions"
 
 Another useful tool is a sub-module of the devel module, called
 devel_node_access which can give you some insight into the contents of
@@ -108,3 +111,4 @@ AUTHOR
 ------
 
 Dave Cohen <http://drupal.org/user/18468>
+http://www.dave-cohen.com
