@@ -26,6 +26,8 @@ Here are some key features of tac_lite:
 * Grant permissions per user.  (Give a specific user access beyond
   what his/her roles allow).
 
+* Supports view, update and delete permissions.
+
 USE CASE
 --------
 
