@@ -42,7 +42,6 @@ function tac_lite_perm() {
 function tac_lite_menu() {
   global $user;
   $items = array();
-  $admin_access = user_access('administer_tac_lite');
 
   $items['admin/user/access/tac_lite'] = 
     array('title' => t('Access control by taxonomy'),
@@ -51,24 +50,16 @@ function tac_lite_menu() {
           'page arguments' => array('tac_lite_admin_settings'),
           'type' => MENU_NORMAL_ITEM,
           'weight' => 1, // after 'roles' tab
-          'access arguments' => array($admin_access),
+          'access arguments' => array('administer_tac_lite'),
     );
 
   $items['admin/user/access/tac_lite/settings'] = 
     array('title' => t('Settings'),
           'type' => MENU_DEFAULT_LOCAL_TASK,
           'weight' => -1,
-          'access arguments' => array($admin_access),
+          'access arguments' => array('administer_tac_lite'),
     );
-  /* XXX
-  $items['admin/user/access/tac_lite/roles'] = 
-    array('title' => t('Role based privileges'),
-          'page callback' => 'drupal_get_form',
-          'page arguments' => array('tac_lite_admin_settings_defaults'),
-          'type' => MENU_LOCAL_TASK,
-          'access arguments' => array($admin_access)
-    );
-  */
+  
   $schemes = variable_get('tac_lite_schemes', 1);
   for ($i = 1; $i <= $schemes; $i++) {
     $items['admin/user/access/tac_lite/scheme_' . $i] = 
@@ -76,7 +67,7 @@ function tac_lite_menu() {
             'page callback' => 'tac_lite_admin_settings_scheme',
             'page arguments' => array((string)$i),
             'type' => MENU_LOCAL_TASK,
-            'access arguments' => array($admin_access),
+            'access arguments' => array('administer_tac_lite'),
       );
   }
 
