@@ -57,7 +57,7 @@ function tac_lite_create_form_alter(&$form, $form_state, $form_id) {
           drupal_access_denied();
           exit();
         }
-
+        
         if (count($form['taxonomy'][$vid]['#options']) <= 1) {
           // Don't show if the only option left is <none>.
           unset($form['taxonomy'][$vid]);

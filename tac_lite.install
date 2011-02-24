@@ -33,7 +33,7 @@ function tac_lite_update_1() {
  */
 function tac_lite_update_2() {
   $ret = array();
-  node_access_rebuild();
+  node_access_rebuild(); // Would batch mode help here?
   // Assume success and return with message.
   $ret[] = array(
     'success' => TRUE,
