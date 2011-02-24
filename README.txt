@@ -1,3 +1,5 @@
+VERSION: CVS HEAD, compatible with Drupal 6.x
+
 OVERVIEW
 --------
 
@@ -15,7 +17,7 @@ wanted more flexibility in granting access on a per user basis.
 
 Here are some key features of tac_lite:
 
-* Designed to be as simple as possible in installation and administration.  
+* Designed to be as simple as possible in installation and administration.
 
 * Uses Drupal's node_access table, db_rewrite_sql hook and
   taxonomy module to leave the smallest possible footprint while doing
