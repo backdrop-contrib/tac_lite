@@ -4,6 +4,7 @@
 /**
  * @file
  *   Installation functions for tac_lite.
+ *   TODO: All updates need proper error handling and responses
  */
 
 /**
@@ -12,8 +13,13 @@
  * Ensure that tac_lite hooks are invoked after taxonomy module hooks.
  */
 function tac_lite_install() {
-  $taxonomy_weight = db_result(db_query("SELECT weight FROM {system} WHERE name = 'taxonomy'"));
-  db_query("UPDATE {system} SET weight = %d WHERE name = 'tac_lite'", $taxonomy_weight + 9);
+  $taxonomy_weight = db_query("SELECT weight FROM {system} WHERE name = 'taxonomy'")->fetchField();
+  $num_updated = db_update('system')
+  ->fields(array(
+    'weight' => $taxonomy_weight + 9,
+  ))
+  ->condition('name', 'tac_lite')
+  ->execute();
 
   // Note that it is not necessary to rebuild the node access table here, as
   // that will be done when module settings are saved.
@@ -23,32 +29,34 @@ function tac_lite_install() {
  * Ensure that tac_lite hooks are invoked after taxonomy module hooks.
  */
 function tac_lite_update_1() {
-  $taxonomy_weight = db_result(db_query("SELECT weight FROM {system} WHERE name = 'taxonomy'"));
-  $ret[] = update_sql("UPDATE {system} SET weight = ". ($taxonomy_weight + 9) ." WHERE name = 'tac_lite'");
-  return $ret;
+  $taxonomy_weight = db_query("SELECT weight FROM {system} WHERE name = 'taxonomy'")->fetchField();
+  $num_updated = db_update('system')
+  ->fields(array(
+    'weight' => $taxonomy_weight + 9,
+  ))
+  ->condition('name', 'tac_lite')
+  ->execute();
 }
 
 /**
  * Ensure that the node_access table is thoroughly cleaned up in Drupal 5 update.
  */
 function tac_lite_update_2() {
-  $ret = array();
   node_access_rebuild(); // Would batch mode help here?
   // Assume success and return with message.
-  $ret[] = array(
-    'success' => TRUE,
-    'query' => t('Rebuilt node access table for tac_lite module.')
-  );
-  return $ret;
+  return t('Rebuilt node access table for tac_lite module.');
 }
 
 /**
  * Introducing schemes. Rename tac_lite_default_grants to tac_lite_grants_scheme_1.
  */
 function tac_lite_update_3() {
-  $ret = array();
-  $ret[] = update_sql("UPDATE {variable} SET name='tac_lite_grants_scheme_1' WHERE name='tac_lite_default_grants'");
-  return $ret;
+  $num_updated = db_update('variable')
+  ->fields(array(
+    'name' => 'tac_lite_grants_scheme_1',
+  ))
+  ->condition('name', 'tac_lite_default_grants')
+  ->execute();
 }
 
 /**
@@ -61,11 +69,16 @@ function tac_lite_update_3() {
  * tac_lite" for UI consistency.
  */
 function tac_lite_update_6001() {
-  $ret = array();
-  $result = db_query("SELECT * FROM {permission} WHERE perm LIKE '%administer_tac_lite%'");
-  while ($permission = db_fetch_object($result)) {
+  // TODO: Please review to make sure this is handling this update properly for this version of code. (only change was formatting and table name)
+  $result = db_query("SELECT * FROM {role_permission} WHERE perm LIKE '%administer_tac_lite%'");
+  foreach ($result as $permission) {
     $perm = str_replace('administer_tac_lite', 'administer tac_lite', $permission->perm);
-    $ret[] = update_sql("UPDATE {permission} SET perm = '". db_escape_string($perm) ."' WHERE rid =". $permission->rid);
+    //db_query("UPDATE {permission} SET perm = '". db_escape_string($perm) ."' WHERE rid =". $permission->rid);
+    $num_updated = db_update('permission')
+    ->fields(array(
+      'perm' => $perm,
+    ))
+    ->condition('rid', $permission->rid)
+    ->execute();
   }
-  return $ret;
 }

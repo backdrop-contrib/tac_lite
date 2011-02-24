@@ -13,7 +13,7 @@
 function tac_lite_help($section) {
   switch ($section) {
     case 'admin/help#tac_lite':
-      $output .= '<p>' . t('This module allows you to restrict access to site content. It uses a simple scheme based on Taxonomy, Users and Roles. It uses the node_access table and other features built into Drupal to hide content from unauthorized users.') . '</p>';
+      $output = '<p>' . t('This module allows you to restrict access to site content. It uses a simple scheme based on Taxonomy, Users and Roles. It uses the node_access table and other features built into Drupal to hide content from unauthorized users.') . '</p>';
       $output .= '<p>' . t('While this module has been designed to be as simple as possible to use, there are several steps required to set it up.') . '</p>';
       $output .= '<ol>';
       $output .= '<li>' . t('Define one or more vocabularies whose terms will control which users have access. For example, you could define a vocabulary called \'Privacy\' with terms \'Public\' and \'Private\'.') . '</li>';
@@ -31,8 +31,13 @@ function tac_lite_help($section) {
 /**
  * Implementation of hook_perm().
  */
-function tac_lite_perm() {
-  return array('administer tac_lite');
+function tac_lite_permission() {
+  return array(
+    'administer tac_lite' => array(
+      'title' => t('administer tac_lite'),
+      'description' => t('TODO Add a description for \'administer tac_lite\''),
+    ),
+  );
 }
 
 /**
@@ -42,17 +47,17 @@ function tac_lite_menu() {
   global $user;
   $items = array();
 
-  $items['admin/user/access/tac_lite'] = array(
+  $items['admin/people/access/tac_lite'] = array(
     'title' => 'Access by Taxonomy',
     'description' => "taxonomy-based permissions by tac_lite",
     'page callback' => 'drupal_get_form',
     'page arguments' => array('tac_lite_admin_settings'),
-    'type' => MENU_NORMAL_ITEM,
+    'type' => MENU_LOCAL_TASK,
     'weight' => 1, // after 'roles' tab
     'access arguments' => array('administer tac_lite'),
   );
 
-  $items['admin/user/access/tac_lite/settings'] = array(
+  $items['admin/people/access/tac_lite/settings'] = array(
     'title' => 'Settings',
     'type' => MENU_DEFAULT_LOCAL_TASK,
     'weight' => -1,
@@ -67,7 +72,7 @@ function tac_lite_menu() {
     } else {
       $title = "Scheme $i";
     }
-    $items['admin/user/access/tac_lite/scheme_' . $i] = array(
+    $items['admin/people/access/tac_lite/scheme_' . $i] = array(
       'title' => $title,
       'page callback' => 'tac_lite_admin_settings_scheme',
       'page arguments' => array((string)$i),
@@ -83,14 +88,14 @@ function tac_lite_menu() {
 /**
  * Returns the settings form
  */
-function tac_lite_admin_settings() {
+function tac_lite_admin_settings($form, &$form_state) {
   $vocabularies = taxonomy_get_vocabularies();
 
   if (!count($vocabularies)) {
     $form['body'] = array(
       '#type' => 'markup',
-      '#value' => t('You must <a href="!url">create a vocabulary</a> before you can use tac_lite.',
-                array('!url' => url('admin/content/taxonomy/add/vocabulary'))),
+      '#markup' => t('You must <a href="!url">create a vocabulary</a> before you can use tac_lite.',
+                array('!url' => url('admin/structure/taxonomy/add/vocabulary'))),
     );
     return $form;
   }
@@ -145,6 +150,11 @@ function _tac_lite_admin_settings_submit($form, &$form_state) {
   menu_rebuild();
 }
 
+/**
+ * Menu callback to create a form for each scheme.
+ * @param $i
+ *   The index of the scheme that we will be creating a form for. Passed in as a page argument from the menu. 
+ */
 function tac_lite_admin_settings_scheme($i) {
   return drupal_get_form('tac_lite_admin_scheme_form', $i);
 }
@@ -186,7 +196,7 @@ function _tac_lite_config($scheme) {
 /**
  * Returns the form for role-based privileges.
  */
-function tac_lite_admin_scheme_form($form_state, $i) {
+function tac_lite_admin_scheme_form($form_state, $form_state, $i) {
   $vids = variable_get('tac_lite_categories', NULL);
   $roles = user_roles();
 
@@ -226,13 +236,13 @@ function tac_lite_admin_scheme_form($form_state, $i) {
 
     $form['helptext'] = array(
       '#type' => 'markup',
-      '#value' => t('To grant to an individual user, visit the <em>access by taxonomy</em> tab on the account edit page.'),
+      '#markup' => t('To grant to an individual user, visit the <em>access by taxonomy</em> tab on the account edit page.'),
       '#prefix' => '<p>',
       '#suffix' => '</p>',
     );
     $form['helptext2'] = array(
       '#type' => 'markup',
-      '#value' => t('To grant by role, select the terms below.'),
+      '#markup' => t('To grant by role, select the terms below.'),
       '#prefix' => '<p>',
       '#suffix' => '</p>',
     );
@@ -250,23 +260,28 @@ function tac_lite_admin_scheme_form($form_state, $i) {
 
       $defaults = isset($all_defaults[$rid]) ? $all_defaults[$rid] : NULL;
       foreach ($vids as $vid) {
+        // Build a taxonomy select form element for this vocab
         $v = $vocabularies[$vid];
-        $form['tac_lite_grants_scheme_' . $i][$rid][$vid] =
-          _taxonomy_term_select($v->name,
-            NULL, // name no longer used in new form api
-            isset($defaults[$vid]) ? $defaults[$vid] : NULL,
-            $vid,
-            '',
-            TRUE,
-            '<' . t('none') . '>');
+        $tree = taxonomy_get_tree($v->vid);
+        $options = array(0 => '<' . t('none') . '>');
+        if ($tree) {
+          foreach ($tree as $term) {
+            $choice = new stdClass();
+            $choice->option = array($term->tid => str_repeat('-', $term->depth) . $term->name);
+            $options[] = $choice;
+          }
+        }
+        $default_values = isset($defaults[$vid]) ? $defaults[$vid] : NULL;
+        $form['tac_lite_grants_scheme_' . $i][$rid][$vid] = _tac_lite_term_select($v, $default_values);
       }
     }
     $form['#submit'][] = 'tac_lite_admin_scheme_form_submit';
     return system_settings_form($form);
   }
   else {
-    return (array('body' => array('#type' => 'markup',
-                          '#value' => t('First select vocabularies on the <a href=!url>settings page</a>.', array('!url' => url('admin/user/access/tac_lite'))))));
+    return (array('body' => array(
+      '#type' => 'markup',
+      '#markup' => t('First select vocabularies on the <a href=!url>settings page</a>.', array('!url' => url('admin/user/access/tac_lite'))))));
   }
 }
 
@@ -278,73 +293,106 @@ function tac_lite_admin_scheme_form_submit($form, &$form_state) {
 }
 
 /**
- * Implementation of hook_user().
+ * Implementation of hook_user_categories
+ * 
+ * Creates the user edit category form for tac_lite's user-specific permissions under user/edit
  */
-function tac_lite_user($op, $edit, $account, $category = NULL) {
+function tac_lite_user_categories() {
+  return array(
+    array(
+      'name' => 'tac_lite',
+      'title' => t('Access by taxonomy'),
+      'weight' => 5,
+      'access callback' => 'user_access',
+      'access arguments' => array('administer users'),
+    ),
+  );
+}
 
-  if (!user_access('administer tac_lite')) {
-    // Only for tac_lite administrators.
-    return;
-  }
-
-  switch ($op) {
-    case 'categories':
-      return array(array('name' => 'tac_lite',
-          'title' => t('Access by taxonomy'),
-          'weight' => 5,
-          'access callback' => 'user_access',
-          'access arguments' => array('administer users'),
-        ),
-      );
-      break;
-
-    case 'form':
+/**
+ * Implementation of hook_form_alter().
+ *  
+ * @param $form
+ *   Nested array of form elements that comprise the form.
+ * @param $form_state
+ *   A keyed array containing the current state of the form. The arguments that drupal_get_form() was originally called with are available in the array $form_state['build_info']['args'].
+ * @param $form_id
+ *   String representing the name of the form itself. Typically this is the name of the function that generated the form.
+ *   
+ */
+function tac_lite_form_alter(&$form, &$form_state, $form_id){
+  // Catch for the tac_lite category on the user edit form.
+  if ($form_id == 'user_profile_form') {
+    if ($form['#user_category'] == 'tac_lite') {
       $vocabularies = taxonomy_get_vocabularies();
-      if ($category == 'tac_lite') {
-        $vids = variable_get('tac_lite_categories', NULL);
-        if (count($vids)) {
-          for ($i = 1; $i <= variable_get('tac_lite_schemes', 1); $i++) {
-            $config = _tac_lite_config($i);
-            $terms = isset($account->$config['realm']) ? $account->$config['realm'] : array();
-            if ($config['name']) {
-              $perms = $config['perms'];
-              if ($config['term_visibility']) {
-                $perms[] = t('term visibility');
+      $vids = variable_get('tac_lite_categories', NULL);
+      if (count($vids)) {
+        for ($i = 1; $i <= variable_get('tac_lite_schemes', 1); $i++) {
+          $config = _tac_lite_config($i);
+          if ($config['name']) {
+            $perms = $config['perms'];
+            if ($config['term_visibility']) {
+              $perms[] = t('term visibility');
+            }
+            $form['tac_lite'][$config['realm']] = array(
+              '#type' => 'fieldset',
+              '#title' => $config['name'],
+              '#description' => t('This scheme controls %perms.', array('%perms' => implode(' and ', $perms))),
+              '#tree' => TRUE,
+            );
+            // Create a form element for each vocabulary
+            foreach ($vids as $vid) {
+              $v = $vocabularies[$vid];
+              // TODO: Should we be looking in form_state also for the default value? 
+              // (Might only be necessary if we are adding in custom validation?)
+              $default_values = array();
+              if ($form['#user']->data[$config['realm']]) {
+                if (isset($form['#user']->data[$config['realm']][$vid])) {
+                  $default_values = $form['#user']->data[$config['realm']][$vid];
+                }
               }
-              $form['tac_lite'][$config['realm']] = array(
-                '#type' => 'fieldset',
-                '#title' => $config['name'],
-                '#description' => t('This scheme controls %perms.',
-                                array('%perms' => implode(' and ', $perms))),
-                '#tree' => TRUE,
-              );
-
-              foreach ($vids as $vid) {
-                $v = $vocabularies[$vid];
-                $form['tac_lite'][$config['realm']][$vid] =
-                  _taxonomy_term_select($v->name,
-                    NULL, // name no longer used in new form api
-                    isset($terms[$vid]) ? $terms[$vid] : NULL,
-                    $vid,
-                    '',
-                    TRUE,
-                    '<' . t('none') . '>');
-                $form['tac_lite'][$config['realm']][$vid]['#description'] =
-                  t('Grant permission to this user by selecting terms.  Note that permissions are in addition to those granted based on user roles.');
-              }
+              $form['tac_lite'][$config['realm']][$vid] =  _tac_lite_term_select($v, $default_values);
+              $form['tac_lite'][$config['realm']][$vid]['#description'] =
+                t('Grant permission to this user by selecting terms.  Note that permissions are in addition to those granted based on user roles.');
             }
           }
-          $form['tac_lite'][0] = array(
-            '#type' => 'markup',
-            '#value' => '<p>' . t('You may grant this user access based on the schemes and terms below.  These permissions are in addition to <a href="!url">role based grants on scheme settings pages</a>.',
-                      array('!url' => url('admin/user/access/tac_lite/scheme_1'))) . "</p>\n",
-            '#weight' => -1,
-          );
-
-          return $form;
         }
+        $form['tac_lite'][0] = array(
+          '#type' => 'markup',
+          '#markup' => '<p>' . t('You may grant this user access based on the schemes and terms below.  These permissions are in addition to <a href="!url">role based grants on scheme settings pages</a>.',
+                    array('!url' => url('admin/people/access/tac_lite/scheme_1'))) . "</p>\n",
+          '#weight' => -1,
+        );
       }
-      break;
+      else {
+        // TODO: Do we need to handle the situation where no vocabularies have been set up yet / none have been assigned to tac_lite?
+      }
+      return $form;      
+    }
+  }
+}
+
+/**
+ * Implementation of hook_user_presave().
+ * 
+ * Move the tac_lite data into the data object
+ * @param $edit
+ *   The array of form values submitted by the user.
+ * @param $account
+ *   The user object on which the operation is performed.
+ * @param $category
+ *   The active category of user information being edited.
+ */
+function tac_lite_user_presave(&$edit, $account, $category) {
+  // Only proceed if we are in the tac_lite category.
+  if ($category == 'tac_lite'){
+    // Go through each scheme and copy the form value into the data element
+    for ($i = 1; $i <= variable_get('tac_lite_schemes', 1); $i++) {
+      $config = _tac_lite_config($i);
+      if ($config['name']) {
+        $edit['data'][$config['realm']] = $edit[$config['realm']];
+      }
+    }
   }
 }
 
@@ -356,20 +404,9 @@ function tac_lite_user($op, $edit, $account, $category = NULL) {
  * terms.
  */
 function tac_lite_node_access_records($node) {
-  // all terms from all vocabs
-  $all_tids = _tac_lite_get_terms($node);
-  // just the vocabs we're interested in
-  $vids = variable_get('tac_lite_categories', NULL);
-  // now find just the terms we're interested in.
-  $tids = array();
-  if (count($all_tids) && count($vids)) {
-    $result = db_query("SELECT DISTINCT td.tid FROM {term_data} td WHERE td.vid IN (%s) AND td.tid IN (%s)",
-              implode(',', $vids),
-              implode(',', $all_tids));
-    while ($term = db_fetch_object($result)) {
-      $tids[] = $term->tid;
-    }
-  }
+  // Get the tids we care about that are assigned to this node
+  $tids = _tac_lite_get_terms($node);
+
   if (!count($tids)) {
     // no relevant terms found.
 
@@ -385,6 +422,10 @@ function tac_lite_node_access_records($node) {
         $grant = array(
           'realm' => $config['realm'],
           'gid' => $tid, // use term id as grant id
+          'grant_view' => 0,
+          'grant_update' => 0,
+          'grant_delete' => 0,
+          'priority' => 0,
         );
         foreach ($config['perms'] as $perm) {
           $grant[$perm] = TRUE;
@@ -397,46 +438,38 @@ function tac_lite_node_access_records($node) {
 }
 
 /**
- * Get terms from a newly udpated node.
- * Terms are placed in $node->taxonomy by the form.
+ * Gets terms from a node that belong to vocabularies selected for use by tac_lite
+ *
+ * @param $node
+ *   A node object
+ * @return
+ *   An array of term ids
  */
-function _tac_lite_get_terms(&$node) {
+function _tac_lite_get_terms($node) {
   $tids = array();
 
-  // emulating code from taxonomy_node_save here.
-  // note that free tagging vocabs not currently supported
-  if (count($node->taxonomy)) {
-    foreach ($node->taxonomy as $term) {
-      if (is_array($term)) {
-        foreach ($term as $tid) {
-          if (is_numeric($tid)) {
-            $tids[$tid] = $tid;
-          }
-          else {
-            // non-numeric means free-tagging vocabulary.
-            // we do not support. Do nothing.
-          }
-        }
-      }
-      elseif (is_object($term)) {
-        // in drupal 5 term is an object. Is this right?
-        $tids[$term->tid] = $term->tid;
-      }
-      elseif (is_numeric($term)) {
-        // $term is a tid.
-        $tids[$term] = $term;
-      }
-      elseif ($term) {
-        drupal_set_message(t('Unexpected term value "%term" in tac_lite.',
-            array('%term' => $term)),
-          'error');
-      }
-    }
+  // Get the vids that tac_lite cares about
+  $vids = variable_get('tac_lite_categories', NULL);
+  
+  // Query for all tids assigned to this node in the vids that we care about
+  $query = db_select('taxonomy_index', 'r');
+  $t_alias = $query->join('taxonomy_term_data', 't', 'r.tid = t.tid');
+  $v_alias = $query->join('taxonomy_vocabulary', 'v', 't.vid = v.vid');
+  $query->fields( $t_alias );
+  $query->condition("r.nid", $node->nid);
+  $query->condition("t.vid", $vids, 'IN');
+  $result = $query->execute();
+  foreach ($result as $term) {
+    $tids[] = $term->tid;
   }
 
   return $tids;
 }
 
+/**
+ * Is this used? It will need the same updates as _tac_lite_get_terms
+ * @param unknown_type $nid
+ */
 function _tac_lite_get_terms_by_nid($nid) {
   $tids = array();
   $terms = taxonomy_node_get_terms($nid);
@@ -446,6 +479,35 @@ function _tac_lite_get_terms_by_nid($nid) {
     $tids[$term->tid] = $term->tid;
   }
   return $tids;
+}
+
+/**
+ * Helper function to build a taxonomy term select element for a form.
+ * 
+ * @param $v
+ *   A vocabulary object containing a vid and name.
+ * @param $default_values
+ *   An array of values to use for the default_value argument for this form element.
+ */
+function _tac_lite_term_select($v, $default_values = array()) {
+  $tree = taxonomy_get_tree($v->vid);
+  $options = array(0 => '<' . t('none') . '>');
+  if ($tree) {
+    foreach ($tree as $term) {
+      $choice = new stdClass();
+      $choice->option = array($term->tid => str_repeat('-', $term->depth) . $term->name);
+      $options[] = $choice;
+    }
+  }
+  $field_array = array(
+    '#type' => 'select',
+    '#title' => $v->name,
+    '#default_value' => $default_values,
+    '#options' => $options,
+    '#multiple' => TRUE,
+    '#description' => $v->description,
+  );
+  return $field_array;
 }
 
 /**
@@ -459,9 +521,9 @@ function _tac_lite_user_tids($account, $scheme) {
   $grants = array(0);
   $config = _tac_lite_config($scheme);
   $realm = $config['realm'];
-  if (isset($account->$realm) && count($account->$realm)) {
+  if (isset($account->data[$realm]) && count($account->data[$realm])) {
     // $account->$realm is array. Keys are vids, values are array of tids within that vocabulary, to which the user has access
-    foreach ($account->$realm as $tids) {
+    foreach ($account->data[$realm] as $tids) {
       if (count($tids)) {
         $grants = array_merge($grants, $tids);
       }
@@ -507,29 +569,29 @@ function tac_lite_node_grants($account, $op) {
   }
 }
 
-function tac_lite_db_rewrite_sql($query, $primary_table, $primary_field, $args) {
+/**
+ * Implements hook_query_TAG_alter().
+ *
+ * Acts on queries that list terms (generally these should be tagged with 'term_access')
+ * to remove any terms that this user should not be able to see.
+ */
+function tac_lite_query_term_access_alter(QueryAlterableInterface $query) {
   global $user;
 
-  if ($primary_field != 'tid') {
-    // Only changes things in link with 'tid'
-    return;
-  }
-
+  // If this user has administer rights, don't filter
   if (user_access('administer tac_lite')) {
-    // Only for tac_lite administrators.
     return;
   }
-
-  // the vocabularies containing protected info.
+ 
+  // Get our vocabularies and schemes from variables. Return if we have none.
   $vids = variable_get('tac_lite_categories', NULL);
   $schemes = variable_get('tac_lite_schemes', 1);
   if (!$vids || !count($vids) || !$schemes) {
     return;
   }
 
-  $term_visibility = FALSE;
-
   // the terms this user is allowed to see
+  $term_visibility = FALSE;
   $tids = array();
   for ($i = 1; $i <= $schemes; $i++) {
     $config = _tac_lite_config($i);
@@ -540,11 +602,20 @@ function tac_lite_db_rewrite_sql($query, $primary_table, $primary_field, $args) 
   }
 
   if ($term_visibility) {
+    // HELP: What is the proper way to find the alias of the primary table here?
+    $primary_table = '';
+    $t = $query->getTables();
+    foreach($t as $key => $info) {
+      if (!$info['join type']) {
+        $primary_table = $info['alias'];
+      }
+    }
+       
     // Prevent query from finding terms the current user does not have permission to see.
-    $join = "LEFT JOIN {term_data} tac_td ON $primary_table.tid = tac_td.tid";
-    $where = "$primary_table.tid IN (" . implode(', ', $tids) .
-      ") OR tac_td.vid NOT IN (" . implode(',', $vids) .")";
-
-    return array('join' => $join, 'where' => $where);
+    $query->leftJoin('taxonomy_term_data', 'tac_td', $primary_table . '.tid = tac_td.tid');
+    $or = db_or();
+    $or->condition($primary_table . '.tid', $tids, 'IN');
+    $or->condition('tac_td.vid', $vids, 'NOT IN');
+    $query->condition($or);
   }
 }

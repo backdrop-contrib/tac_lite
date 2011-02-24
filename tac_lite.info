@@ -2,4 +2,5 @@
 name = Taxonomy Access Control Lite
 description = Simple access control based on categories.
 dependencies[] = taxonomy
-core = 6.x
+core = 7.x
+package = Node Access

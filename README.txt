@@ -1,4 +1,4 @@
-VERSION: CVS HEAD, compatible with Drupal 6.x
+VERSION: CVS HEAD, compatible with D7, dev release use at own risk.
 
 OVERVIEW
 --------
