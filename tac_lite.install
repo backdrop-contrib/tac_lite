@@ -8,7 +8,7 @@
 
 /**
  * Implementation of hook_install().
- * 
+ *
  * Ensure that tac_lite hooks are invoked after taxonomy module hooks.
  */
 function tac_lite_install() {
