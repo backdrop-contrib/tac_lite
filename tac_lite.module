@@ -1,5 +1,4 @@
 <?php
-// $Id$
 /**
  * @file
  *   Control access to site content based on taxonomy, roles and users.
