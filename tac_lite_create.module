@@ -34,44 +34,82 @@ function tac_lite_create_form_alter(&$form, $form_state, $form_id) {
       }
     }
 
-    if (isset($form['taxonomy'])) {
-      foreach ($form['taxonomy'] as $vid => $data) {
-        if (!is_numeric($vid) || !in_array($vid, $vids)) {
-          // Not a vid, or not controlled by tac_lite.
-          continue;
-        }
-        foreach ($data['#options'] as $num => $term) {
-          if (!is_numeric($num)) {
-            continue;
+    // Go through all of the fields in the system to find the ones we want use
+    $term_fields = array();  
+    $info = field_info_fields();
+    foreach($info as $key => $value){
+      // First check for taxonomy_term_reference fields.
+      if ($value['type'] == 'taxonomy_term_reference') {
+        // Then check to see if they are associated with this node type (entity bundle).
+        if (isset($value['bundles']['node'])) {
+          if (in_array($form['#bundle'], $value['bundles']['node'])) {
+            // Add an entry to our term_fields in the form of field name => vocabulary machine name
+            $term_fields[$key] = $value['settings']['allowed_values'][0]['vocabulary'];
           }
-          if (!in_array(key($term->option), $tids)) {
-            if (!in_array(key($term->option), $form['taxonomy'][$vid]['#default_value'])) {
-              // The term is not the default value, and user is not allowed to create with it.
-              unset($form['taxonomy'][$vid]['#options'][$num]);
-            }
-          }
-        }
-
-        if (count($form['taxonomy'][$vid]['#options']) == 0 && $form['taxonomy'][$vid]['#required'] == TRUE) {
-          drupal_set_message(t('You have no permissions to add content to the required %name vocabulary. Please contact the site administrator if you believe you should have permission to add content.', array('%name' => $form['taxonomy'][$vid]['#title'])));
-          drupal_access_denied();
-          exit();
-        }
-        
-        if (count($form['taxonomy'][$vid]['#options']) <= 1) {
-          // Don't show if the only option left is <none>.
-          unset($form['taxonomy'][$vid]);
-        }
-        if (isset($form['taxonomy'][$vid]['#size']) &&
-          $form['taxonomy'][$vid]['#size'] > count($form['taxonomy'][$vid]['#options'])) {
-          $form['taxonomy'][$vid]['#size'] = count($form['taxonomy'][$vid]['#options']);
         }
       }
+    }
+    
+    // Now that we have the names of the fields, go through each one in the form.
+    foreach($term_fields as $field_name => $vocab_name) {
+      // Get the language key so we can find the correct element in the field.
+      $field_language = $form[$field_name]['#language'];
+
+      // Skip auto complete fields as they are not supported.
+      if ($form[$field_name][$field_language]['#type'] != 'select' && $form[$field_name][$field_language]['#type'] != 'radios'){
+        continue;
+      }
+      
+      // Get the vocabulary info so we can get the vid.
+      $v = taxonomy_vocabulary_machine_name_load($vocab_name);
+      
+      // We only want to act on this field if it is tied to a vocabulary we are set to control.
+      if(!in_array($v->vid, $vids)) {
+        continue;
+      }
+      
+      // Go through each option for this field.
+      foreach ($form[$field_name][$field_language]['#options'] as $term_id => $term_name) {
+        // Skip the "<none>" option (or anything like it).
+        if (!is_numeric($term_id)) {
+          continue;
+        }
+
+        // Is this option not in the list of terms this user can create with?
+        if (!in_array($term_id, $tids)) {
+          // The term is not the default value, and user is not allowed to create with it.
+          // HELP: What if it IS the default value? Do we not unset it?
+          if ($term_id != $form[$field_name][$field_language]['#default_value']) {
+            // Unset the option to it doesn't appear.
+            // TODO: It would be a nice feature to have tids that are already selected.
+            // go into a value element so we could merge then when saving the node.
+            unset($form[$field_name][$field_language]['#options'][$term_id]);
+          }
+        }
+      }
+
+      // If there are no options left, but this field is required then throw a 404.
+      if (count($form[$field_name][$field_language]['#options']) == 0 && $form[$field_name]['#required'] == TRUE) {
+        drupal_set_message(t('You have no permissions to add content to the required %name vocabulary. Please contact the site administrator if you believe you should have permission to add content.', array('%name' => $form[$field_name]['#title'])));
+        drupal_access_denied();
+        exit();
+      }
+
+      // Don't show if the only option left is <none>.
+      if (count($form[$field_name][$field_language]['#options']) <= 1) {
+        unset($form[$field_name]);
+      }
+      // HELP: Is size deprecated?
+      /*
+      if (isset($form[$field_name]['#size']) && $form[$field_name]['#size'] > count($form['taxonomy'][$field_language]['#options'])) {
+        $form[$field_name]['#size'] = count($form[$field_name][$field_language]['#options']);
+      }
+      */
     }
   }
   elseif ($form_id == 'tac_lite_admin_scheme_form') {
     $config = $form['#tac_lite_config'];
-    $scheme = $form['#parameters'][2];
+    $scheme = $form_state['build_info']['args'][0];
 
     $form['tac_lite_config_scheme_' . $scheme]['tac_lite_create'] = array(
       '#type' => 'checkbox',
