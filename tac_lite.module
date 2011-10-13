@@ -120,7 +120,7 @@ function tac_lite_admin_settings($form, &$form_state) {
       $scheme_options[$i] = $i;
     $form['tac_lite_schemes'] = array(
       '#type' => 'select',
-      '#title' => t('Schemes'),
+      '#title' => t('Number of Schemes'),
       '#description' => t('Each scheme allows for a different set of permissions.  For example, use scheme 1 for read-only permission; scheme 2 for read and update; scheme 3 for delete; etc.  Additional schemes increase the size of your node_access table, so use no more than you need.'),
       '#default_value' => variable_get('tac_lite_schemes', 1),
       '#options' => $scheme_options,
@@ -152,7 +152,7 @@ function _tac_lite_admin_settings_submit($form, &$form_state) {
 /**
  * Menu callback to create a form for each scheme.
  * @param $i
- *   The index of the scheme that we will be creating a form for. Passed in as a page argument from the menu. 
+ *   The index of the scheme that we will be creating a form for. Passed in as a page argument from the menu.
  */
 function tac_lite_admin_settings_scheme($i) {
   return drupal_get_form('tac_lite_admin_scheme_form', $i);
@@ -280,7 +280,7 @@ function tac_lite_admin_scheme_form($form_state, $form_state, $i) {
   else {
     return (array('body' => array(
       '#type' => 'markup',
-      '#markup' => t('First select vocabularies on the <a href=!url>settings page</a>.', array('!url' => url('admin/user/access/tac_lite'))))));
+      '#markup' => t('First select vocabularies on the <a href=!url>settings page</a>.', array('!url' => url('admin/people/access/tac_lite/settings'))))));
   }
 }
 
@@ -293,7 +293,7 @@ function tac_lite_admin_scheme_form_submit($form, &$form_state) {
 
 /**
  * Implementation of hook_user_categories
- * 
+ *
  * Creates the user edit category form for tac_lite's user-specific permissions under user/edit
  */
 function tac_lite_user_categories() {
@@ -310,14 +310,14 @@ function tac_lite_user_categories() {
 
 /**
  * Implementation of hook_form_alter().
- *  
+ *
  * @param $form
  *   Nested array of form elements that comprise the form.
  * @param $form_state
  *   A keyed array containing the current state of the form. The arguments that drupal_get_form() was originally called with are available in the array $form_state['build_info']['args'].
  * @param $form_id
  *   String representing the name of the form itself. Typically this is the name of the function that generated the form.
- *   
+ *
  */
 function tac_lite_form_alter(&$form, &$form_state, $form_id){
   // Catch for the tac_lite category on the user edit form.
@@ -342,7 +342,7 @@ function tac_lite_form_alter(&$form, &$form_state, $form_id){
             // Create a form element for each vocabulary
             foreach ($vids as $vid) {
               $v = $vocabularies[$vid];
-              // TODO: Should we be looking in form_state also for the default value? 
+              // TODO: Should we be looking in form_state also for the default value?
               // (Might only be necessary if we are adding in custom validation?)
               $default_values = array();
               if ($form['#user']->data[$config['realm']]) {
@@ -366,14 +366,14 @@ function tac_lite_form_alter(&$form, &$form_state, $form_id){
       else {
         // TODO: Do we need to handle the situation where no vocabularies have been set up yet / none have been assigned to tac_lite?
       }
-      return $form;      
+      return $form;
     }
   }
 }
 
 /**
  * Implementation of hook_user_presave().
- * 
+ *
  * Move the tac_lite data into the data object
  * @param $edit
  *   The array of form values submitted by the user.
@@ -449,17 +449,24 @@ function _tac_lite_get_terms($node) {
 
   // Get the vids that tac_lite cares about
   $vids = variable_get('tac_lite_categories', NULL);
-  
-  // Query for all tids assigned to this node in the vids that we care about
-  $query = db_select('taxonomy_index', 'r');
-  $t_alias = $query->join('taxonomy_term_data', 't', 'r.tid = t.tid');
-  $v_alias = $query->join('taxonomy_vocabulary', 'v', 't.vid = v.vid');
-  $query->fields( $t_alias );
-  $query->condition("r.nid", $node->nid);
-  $query->condition("t.vid", $vids, 'IN');
-  $result = $query->execute();
-  foreach ($result as $term) {
-    $tids[] = $term->tid;
+  if ($vids) {
+    // Query for all tids assigned to this node in the vids that we care about
+    $query = db_select('taxonomy_index', 'r');
+    $t_alias = $query->join('taxonomy_term_data', 't', 'r.tid = t.tid');
+    $v_alias = $query->join('taxonomy_vocabulary', 'v', 't.vid = v.vid');
+    $query->fields( $t_alias );
+    $query->condition("r.nid", $node->nid);
+    $query->condition("t.vid", $vids, 'IN');
+    $result = $query->execute();
+    foreach ($result as $term) {
+      $tids[] = $term->tid;
+    }
+  }
+  elseif (user_access('administer tac_lite')) {
+    drupal_set_message(t('tac_lite.module enabled, but not <a href=!admin_url>configured</a>. No tac_lite terms associated with %title.', array(
+                           '!admin_url' => url('admin/people/access/tac_lite'),
+                           '%title' => $node->title,
+                         )));
   }
 
   return $tids;
@@ -482,7 +489,7 @@ function _tac_lite_get_terms_by_nid($nid) {
 
 /**
  * Helper function to build a taxonomy term select element for a form.
- * 
+ *
  * @param $v
  *   A vocabulary object containing a vid and name.
  * @param $default_values
@@ -581,7 +588,7 @@ function tac_lite_query_term_access_alter(QueryAlterableInterface $query) {
   if (user_access('administer tac_lite')) {
     return;
   }
- 
+
   // Get our vocabularies and schemes from variables. Return if we have none.
   $vids = variable_get('tac_lite_categories', NULL);
   $schemes = variable_get('tac_lite_schemes', 1);
@@ -609,7 +616,7 @@ function tac_lite_query_term_access_alter(QueryAlterableInterface $query) {
         $primary_table = $info['alias'];
       }
     }
-       
+
     // Prevent query from finding terms the current user does not have permission to see.
     $query->leftJoin('taxonomy_term_data', 'tac_td', $primary_table . '.tid = tac_td.tid');
     $or = db_or();
