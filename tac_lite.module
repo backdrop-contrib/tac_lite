@@ -459,7 +459,7 @@ function _tac_lite_get_terms($node) {
     $query->condition("t.vid", $vids, 'IN');
     $result = $query->execute();
     foreach ($result as $term) {
-      $tids[] = $term->tid;
+      $tids[$term->tid] = $term->tid;
     }
   }
   elseif (user_access('administer tac_lite')) {
