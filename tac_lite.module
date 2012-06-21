@@ -385,7 +385,7 @@ function tac_lite_form_alter(&$form, &$form_state, $form_id){
               // TODO: Should we be looking in form_state also for the default value?
               // (Might only be necessary if we are adding in custom validation?)
               $default_values = array();
-              if ($form['#user']->data[$config['realm']]) {
+              if (!empty($form['#user']->data[$config['realm']])) {
                 if (isset($form['#user']->data[$config['realm']][$vid])) {
                   $default_values = $form['#user']->data[$config['realm']][$vid];
                 }
