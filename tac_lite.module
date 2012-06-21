@@ -113,6 +113,7 @@ function tac_lite_admin_settings($form, &$form_state) {
       '#multiple' => TRUE,
       '#required' => TRUE,
     );
+
     $scheme_options = array();
     // Currently only view, edit, delete permissions possible, so 7
     // permutations will be more than enough.
@@ -195,13 +196,13 @@ function _tac_lite_config($scheme) {
 /**
  * Returns the form for role-based privileges.
  */
-function tac_lite_admin_scheme_form($form_state, $form_state, $i) {
+function tac_lite_admin_scheme_form($form, $form_state, $i) {
   $vids = variable_get('tac_lite_categories', NULL);
   $roles = user_roles();
 
+  $config = _tac_lite_config($i);
+  $form['#tac_lite_config'] = $config;
   if (count($vids)) {
-    $config = _tac_lite_config($i);
-    $form['#tac_lite_config'] = $config;
     $form['tac_lite_config_scheme_' . $i] = array('#tree' => TRUE);
     $form['tac_lite_config_scheme_' . $i]['name'] = array(
       '#type' => 'textfield',
@@ -278,9 +279,11 @@ function tac_lite_admin_scheme_form($form_state, $form_state, $i) {
     return system_settings_form($form);
   }
   else {
-    return (array('body' => array(
+    $form['tac_lite_help'] = array(
       '#type' => 'markup',
-      '#markup' => t('First select vocabularies on the <a href=!url>settings page</a>.', array('!url' => url('admin/people/access/tac_lite/settings'))))));
+      '#prefix' => '<p>', '#suffix' => '</p>',
+      '#markup' => t('First, select one or more vocabularies on the <a href=!url>settings tab</a>. Then, return to this page to complete configuration.', array('!url' => url('admin/people/access/tac_lite/settings'))));
+    return $form;
   }
 }
 

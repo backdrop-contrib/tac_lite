@@ -35,7 +35,7 @@ function tac_lite_create_form_alter(&$form, $form_state, $form_id) {
     }
 
     // Go through all of the fields in the system to find the ones we want use
-    $term_fields = array();  
+    $term_fields = array();
     $info = field_info_fields();
     foreach($info as $key => $value){
       // First check for taxonomy_term_reference fields.
@@ -49,7 +49,7 @@ function tac_lite_create_form_alter(&$form, $form_state, $form_id) {
         }
       }
     }
-    
+
     // Now that we have the names of the fields, go through each one in the form.
     foreach($term_fields as $field_name => $vocab_name) {
       // Get the language key so we can find the correct element in the field.
@@ -59,15 +59,15 @@ function tac_lite_create_form_alter(&$form, $form_state, $form_id) {
       if ($form[$field_name][$field_language]['#type'] != 'select' && $form[$field_name][$field_language]['#type'] != 'radios'){
         continue;
       }
-      
+
       // Get the vocabulary info so we can get the vid.
       $v = taxonomy_vocabulary_machine_name_load($vocab_name);
-      
+
       // We only want to act on this field if it is tied to a vocabulary we are set to control.
       if(!in_array($v->vid, $vids)) {
         continue;
       }
-      
+
       // Go through each option for this field.
       foreach ($form[$field_name][$field_language]['#options'] as $term_id => $term_name) {
         // Skip the "<none>" option (or anything like it).
@@ -110,12 +110,13 @@ function tac_lite_create_form_alter(&$form, $form_state, $form_id) {
   elseif ($form_id == 'tac_lite_admin_scheme_form') {
     $config = $form['#tac_lite_config'];
     $scheme = $form_state['build_info']['args'][0];
-
-    $form['tac_lite_config_scheme_' . $scheme]['tac_lite_create'] = array(
-      '#type' => 'checkbox',
-      '#title' => 'Visibility on create and edit forms',
-      '#default_value' => isset($config['tac_lite_create']) ? $config['tac_lite_create'] : FALSE,
-      '#description' => t('Show terms when creating content.  This <strong>does not</strong> control which users can create a given content type. This <strong>does</strong> control which terms appear on the node edit forms.  <br/>Note that schemes granting <em>update</em> permission (above) imply <em>visibility on forms</em> as well.'),
-    );
+    if (!empty($form['tac_lite_config_scheme_' . $scheme])) {
+      $form['tac_lite_config_scheme_' . $scheme]['tac_lite_create'] = array(
+        '#type' => 'checkbox',
+        '#title' => 'Visibility on create and edit forms',
+        '#default_value' => isset($config['tac_lite_create']) ? $config['tac_lite_create'] : FALSE,
+        '#description' => t('Show terms when creating content.  This <strong>does not</strong> control which users can create a given content type. This <strong>does</strong> control which terms appear on the node edit forms.  <br/>Note that schemes granting <em>update</em> permission (above) imply <em>visibility on forms</em> as well.'),
+      );
+    }
   }
 }
