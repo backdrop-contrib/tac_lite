@@ -115,12 +115,13 @@ function tac_lite_create_form_alter(&$form, $form_state, $form_id) {
   elseif ($form_id == 'tac_lite_admin_scheme_form') {
     $config = $form['#tac_lite_config'];
     $scheme = $form_state['build_info']['args'][0];
-
-    $form['tac_lite_config_scheme_' . $scheme]['tac_lite_create'] = array(
-      '#type' => 'checkbox',
-      '#title' => 'Visibility on create and edit forms',
-      '#default_value' => isset($config['tac_lite_create']) ? $config['tac_lite_create'] : FALSE,
-      '#description' => t('Show terms when creating content.  This <strong>does not</strong> control which users can create a given content type. This <strong>does</strong> control which terms appear on the node edit forms.  <br/>Note that schemes granting <em>update</em> permission (above) imply <em>visibility on forms</em> as well.'),
-    );
+    if (!empty($form['tac_lite_config_scheme_' . $scheme])) {
+      $form['tac_lite_config_scheme_' . $scheme]['tac_lite_create'] = array(
+        '#type' => 'checkbox',
+        '#title' => 'Visibility on create and edit forms',
+        '#default_value' => isset($config['tac_lite_create']) ? $config['tac_lite_create'] : FALSE,
+        '#description' => t('Show terms when creating content.  This <strong>does not</strong> control which users can create a given content type. This <strong>does</strong> control which terms appear on the node edit forms.  <br/>Note that schemes granting <em>update</em> permission (above) imply <em>visibility on forms</em> as well.'),
+      );
+    }
   }
 }

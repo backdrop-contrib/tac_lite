@@ -25,6 +25,20 @@ function tac_lite_install() {
 }
 
 /**
+ * Implements hook_uninstall().
+ *
+ * Clean up tac_lite variables.
+ */
+function tac_lite_uninstall() {
+  for ($i = 1; $i <= variable_get('tac_lite_schemes', 1); $i++) {
+    variable_del('tac_lite_config_scheme_' . $i);
+    variable_del('tac_lite_grants_scheme_' . $i);
+  }
+  variable_del('tac_lite_schemes');
+  variable_del('tac_lite_categories');
+}
+
+/**
  * Ensure that tac_lite hooks are invoked after taxonomy module hooks.
  */
 function tac_lite_update_1() {

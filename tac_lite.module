@@ -46,17 +46,16 @@ function tac_lite_menu() {
   global $user;
   $items = array();
 
-  $items['admin/people/access/tac_lite'] = array(
+  $items['admin/config/people/tac_lite'] = array(
     'title' => 'Access by Taxonomy',
     'description' => "taxonomy-based permissions by tac_lite",
     'page callback' => 'drupal_get_form',
     'page arguments' => array('tac_lite_admin_settings'),
-    'type' => MENU_LOCAL_TASK,
     'weight' => 1, // after 'roles' tab
     'access arguments' => array('administer tac_lite'),
   );
 
-  $items['admin/people/access/tac_lite/settings'] = array(
+  $items['admin/config/people/tac_lite/settings'] = array(
     'title' => 'Settings',
     'type' => MENU_DEFAULT_LOCAL_TASK,
     'weight' => -1,
@@ -71,7 +70,7 @@ function tac_lite_menu() {
     } else {
       $title = "Scheme $i";
     }
-    $items['admin/people/access/tac_lite/scheme_' . $i] = array(
+    $items['admin/config/people/tac_lite/scheme_' . $i] = array(
       'title' => $title,
       'page callback' => 'tac_lite_admin_settings_scheme',
       'page arguments' => array((string)$i),
@@ -113,6 +112,7 @@ function tac_lite_admin_settings($form, &$form_state) {
       '#multiple' => TRUE,
       '#required' => TRUE,
     );
+
     $scheme_options = array();
     // Currently only view, edit, delete permissions possible, so 7
     // permutations will be more than enough.
@@ -127,6 +127,15 @@ function tac_lite_admin_settings($form, &$form_state) {
       '#required' => TRUE,
     );
 
+    $form['tac_lite_rebuild'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Rebuild content permissions now'),
+      '#default_value' => FALSE, // default false because usually only needed after scheme has been changed.
+      '#description' => t('Do this once, after you have fully configured access by taxonomy.'),
+      '#weight' => 9,
+    );
+
+
     $ret = system_settings_form($form);
     // Special handling is required when this form is submitted.
     $ret['#submit'][] = '_tac_lite_admin_settings_submit';
@@ -140,13 +149,22 @@ function tac_lite_admin_settings($form, &$form_state) {
  * 2008 : Modified by Paulo to be compliant with drupal 6
  */
 function _tac_lite_admin_settings_submit($form, &$form_state) {
-  // First, save settings the default way.
-  system_settings_form_submit($form, $form_state);
-  // Next, rebuild the node_access table.
-  node_access_rebuild(TRUE);
-  //drupal_set_message(t('The content access permissions have been rebuilt.'));
+  $rebuild = $form_state['values']['tac_lite_rebuild'];
+
+  // Rebuild the node_access table.
+  if ($rebuild) {
+    node_access_rebuild(TRUE);
+  }
+  else {
+    drupal_set_message(t('Do not forget to <a href=!url>rebuild node access permissions</a> after you have configured taxonomy-based access.', array(
+                           '!url' => url('admin/reports/status/rebuild'),
+                         )), 'warning');
+  }
+
   // And rebuild menus, in case the number of schemes has changed.
   menu_rebuild();
+
+  variable_del('tac_lite_rebuild'); // We don't need to store this as a system variable.
 }
 
 /**
@@ -195,13 +213,13 @@ function _tac_lite_config($scheme) {
 /**
  * Returns the form for role-based privileges.
  */
-function tac_lite_admin_scheme_form($form_state, $form_state, $i) {
+function tac_lite_admin_scheme_form($form, $form_state, $i) {
   $vids = variable_get('tac_lite_categories', NULL);
   $roles = user_roles();
 
+  $config = _tac_lite_config($i);
+  $form['#tac_lite_config'] = $config;
   if (count($vids)) {
-    $config = _tac_lite_config($i);
-    $form['#tac_lite_config'] = $config;
     $form['tac_lite_config_scheme_' . $i] = array('#tree' => TRUE);
     $form['tac_lite_config_scheme_' . $i]['name'] = array(
       '#type' => 'textfield',
@@ -274,13 +292,24 @@ function tac_lite_admin_scheme_form($form_state, $form_state, $i) {
         $form['tac_lite_grants_scheme_' . $i][$rid][$vid] = _tac_lite_term_select($v, $default_values);
       }
     }
+
+    $form['tac_lite_rebuild'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Rebuild content permissions now'),
+      '#default_value' => FALSE, // default false because usually only needed after scheme has been changed.
+      '#description' => t('Do this once, after you have fully configured access by taxonomy.'),
+      '#weight' => 9,
+    );
+
     $form['#submit'][] = 'tac_lite_admin_scheme_form_submit';
     return system_settings_form($form);
   }
   else {
-    return (array('body' => array(
+    $form['tac_lite_help'] = array(
       '#type' => 'markup',
-      '#markup' => t('First select vocabularies on the <a href=!url>settings page</a>.', array('!url' => url('admin/people/access/tac_lite/settings'))))));
+      '#prefix' => '<p>', '#suffix' => '</p>',
+      '#markup' => t('First, select one or more vocabularies on the <a href=!url>settings tab</a>. Then, return to this page to complete configuration.', array('!url' => url('admin/config/people/tac_lite/settings'))));
+    return $form;
   }
 }
 
@@ -289,6 +318,17 @@ function tac_lite_admin_scheme_form($form_state, $form_state, $i) {
  */
 function tac_lite_admin_scheme_form_submit($form, &$form_state) {
   variable_set('menu_rebuild_needed', TRUE);
+
+  // Rebuild the node_access table.
+  if ($form_state['values']['tac_lite_rebuild']) {
+    node_access_rebuild(TRUE);
+  }
+  else {
+    drupal_set_message(t('Do not forget to <a href=!url>rebuild node access permissions</a> after you have configured taxonomy-based access.', array(
+                           '!url' => url('admin/reports/status/rebuild'),
+                         )), 'warning');
+  }
+  variable_del('tac_lite_rebuild'); // We don't need to store this as a system variable.
 }
 
 /**
@@ -345,7 +385,7 @@ function tac_lite_form_alter(&$form, &$form_state, $form_id){
               // TODO: Should we be looking in form_state also for the default value?
               // (Might only be necessary if we are adding in custom validation?)
               $default_values = array();
-              if ($form['#user']->data[$config['realm']]) {
+              if (!empty($form['#user']->data[$config['realm']])) {
                 if (isset($form['#user']->data[$config['realm']][$vid])) {
                   $default_values = $form['#user']->data[$config['realm']][$vid];
                 }
@@ -359,7 +399,7 @@ function tac_lite_form_alter(&$form, &$form_state, $form_id){
         $form['tac_lite'][0] = array(
           '#type' => 'markup',
           '#markup' => '<p>' . t('You may grant this user access based on the schemes and terms below.  These permissions are in addition to <a href="!url">role based grants on scheme settings pages</a>.',
-                    array('!url' => url('admin/people/access/tac_lite/scheme_1'))) . "</p>\n",
+                    array('!url' => url('admin/config/people/tac_lite/scheme_1'))) . "</p>\n",
           '#weight' => -1,
         );
       }
@@ -464,7 +504,7 @@ function _tac_lite_get_terms($node) {
   }
   elseif (user_access('administer tac_lite')) {
     drupal_set_message(t('tac_lite.module enabled, but not <a href=!admin_url>configured</a>. No tac_lite terms associated with %title.', array(
-                           '!admin_url' => url('admin/people/access/tac_lite'),
+                           '!admin_url' => url('admin/config/people/tac_lite'),
                            '%title' => $node->title,
                          )));
   }
