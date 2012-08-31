@@ -35,7 +35,7 @@ function tac_lite_create_form_alter(&$form, $form_state, $form_id) {
     }
 
     // Go through all of the fields in the system to find the ones we want use
-    $term_fields = array();  
+    $term_fields = array();
     $info = field_info_fields();
     foreach($info as $key => $value){
       // First check for taxonomy_term_reference fields.
@@ -49,25 +49,30 @@ function tac_lite_create_form_alter(&$form, $form_state, $form_id) {
         }
       }
     }
-    
+
     // Now that we have the names of the fields, go through each one in the form.
     foreach($term_fields as $field_name => $vocab_name) {
       // Get the language key so we can find the correct element in the field.
       $field_language = $form[$field_name]['#language'];
 
+      // Avoid PHP errors
+      if (empty($form[$field_name]) || empty($form[$field_name][$field_language])) {
+        continue;
+      }
+
       // Skip auto complete fields as they are not supported.
       if ($form[$field_name][$field_language]['#type'] != 'select' && $form[$field_name][$field_language]['#type'] != 'radios'){
         continue;
       }
-      
+
       // Get the vocabulary info so we can get the vid.
       $v = taxonomy_vocabulary_machine_name_load($vocab_name);
-      
+
       // We only want to act on this field if it is tied to a vocabulary we are set to control.
       if(!in_array($v->vid, $vids)) {
         continue;
       }
-      
+
       // Go through each option for this field.
       foreach ($form[$field_name][$field_language]['#options'] as $term_id => $term_name) {
         // Skip the "<none>" option (or anything like it).
@@ -89,7 +94,7 @@ function tac_lite_create_form_alter(&$form, $form_state, $form_id) {
       }
 
       // If there are no options left, but this field is required then throw a 404.
-      if (count($form[$field_name][$field_language]['#options']) == 0 && $form[$field_name]['#required'] == TRUE) {
+      if (count($form[$field_name][$field_language]['#options']) == 0 && !empty($form[$field_name]['#required'])) {
         drupal_set_message(t('You have no permissions to add content to the required %name vocabulary. Please contact the site administrator if you believe you should have permission to add content.', array('%name' => $form[$field_name]['#title'])));
         drupal_access_denied();
         exit();
