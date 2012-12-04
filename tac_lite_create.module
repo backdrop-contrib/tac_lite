@@ -102,7 +102,7 @@ function tac_lite_create_form_alter(&$form, $form_state, $form_id) {
 
       // Don't show if the only option left is <none>.
       if (count($form[$field_name][$field_language]['#options']) <= 1) {
-        unset($form[$field_name]);
+        $form[$field_name]['#access'] = FALSE;
       }
       // HELP: Is size deprecated?
       /*
