@@ -12,16 +12,27 @@
 function tac_lite_help($section) {
   switch ($section) {
     case 'admin/help#tac_lite':
-      $output = '<p>' . t('This module allows you to restrict access to site content. It uses a simple scheme based on Taxonomy, Users and Roles. It uses the node_access table and other features built into Drupal to hide content from unauthorized users.') . '</p>';
-      $output .= '<p>' . t('While this module has been designed to be as simple as possible to use, there are several steps required to set it up.') . '</p>';
+      // $output .= '<p>' . t('') . '</p>';
+      $output = '<p>' . t('Taxonomy Access Control Lite allows you to restrict access to site content. It uses a simple scheme based on Taxonomy, Users and Roles.') . '</p>';
+      $output .= '<p>' . t('This module leverages Drupal\'s node_access table allows this module to grant permission to view, update, and delete nodes.  To control which users can <em>create</em> new nodes, use Drupal\'s role based permissions.') . '</p>';
+      $output .= '<p>' . t('It is important to understand that this module <em>grants</em> privileges, as opposed to <em>revoking</em> privileges.  So, use Drupal\'s built-in permissions to hide content from certain roles, then use this module to show the content.  This module cannot hide content that the user is allowed to see based on their existing privileges.') . '</p>';
+$output .= '<p>' . t('There are several steps required to set up Taxonomy Access Control Lite.') . '</p>';
       $output .= '<ol>';
       $output .= '<li>' . t('Define one or more vocabularies whose terms will control which users have access. For example, you could define a vocabulary called \'Privacy\' with terms \'Public\' and \'Private\'.') . '</li>';
-      $output .= '<li>' . t('Tell this module which vocabulary or vocabularies control privacy. (!link)', array('!link' => l(t('administer -> access control -> tac_lite'), 'admin/user/access/tac_lite'))) . '</li>';
-      $output .= '<li>' . t('Grant access to users based on their roles (!link), and/or...', array('!link' => l(t('administer -> access control -> tac_lite -> by role'), 'admin/user/access/tac_lite/roles'))) . '</li>';
-      $output .= '<li>' . t('Grant access to individual users. (See the taxonomy-based access tab under user -> edit.)') . '</li>';
-      $output .= '<li>' . t('Finally, if your site contains content, you will need to re-save all nodes. This ensures that Drupal\'s node_access table is up-to-date. Otherwise, content submitted before this module was configured will be hidden.') . '</li>';
+      $output .= '<li>' . t('Tell this module which vocabularies control privacy. (!link)', array('!link' => l(t('administer -> people -> access control by taxonomy'), 'admin/people/access/tac_lite'))) . '</li>';
+      $output .= '<li>' . t('Configure one or more <em>schemes</em>.   simple site may need only one scheme which grants view permission.  A more complex site might require additional schemes for update and delete.  Each scheme associates roles and terms.  Users will be granted priviliges based on their role and the terms with which nodes are tagged.') . '</li>';
+      $output .= '<li>' . t('When settings are correct, <a href=!url>rebuild node_access permissions</a>.', array(
+                   '!url' => url('admin/reports/status/rebuild'),
+                 )) . '</li>';
+      $output .= '<li>' . t('Optionally, grant access to individual users. (See the <em>access by taxonomy</em> tab, under user -> edit.)') . '</li>';
       $output .= '</ol>';
-      $output .= '<p>' . t('Currently, this module works with view grants only (no update or delete grants).') . '</p>';
+      $output .= '<p>' . t('Troubleshooting:.') . '<ul>';
+      $output .= '<li>' . t('Try rebuilding node_access permissions.') . '</li>';
+      $output .= '<li>' . t('Try disabling tac_lite.module, rebuilding permissions.  With the module disabled, users should not have the privileges you are attempting to grant with this module.') . '</li>';
+      $output .= '<li>' . t('The devel_node_access.module (part of <a href=!url>devel</a>) helps to see exactly what Drupal\'s node_access table is doing.', array(
+                   '!url' => 'http://drupal.org/project/devel',
+                 )) . '</li>';
+      $output .= '</ul></p>';
       return $output;
       break;
   }
