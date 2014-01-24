@@ -95,3 +95,14 @@ function tac_lite_update_6001() {
     ->execute();
   }
 }
+
+/**
+ * The tac_lite.module now supports an option to apply access by taxonomy to unpublished nodes as well as published content.  The default behavior is that tac_lite has no effect on unpublished content.  You should review each of your tac_lite schemes and, optionally, adjust this setting before rebuilding node access permissions.
+ */
+function tac_lite_update_7001() {
+  //  See https://drupal.org/node/1918272 for details.
+  drupal_set_message(t('Please review each of your <a href="!url">taxonomy access control schemes</a>.  If necessary, adjust the new option to affect access to unpublished content.  Then rebuild content access permissions.', array(
+        '!url' => url('admin/config/people/tac_lite'),
+      )));
+  node_access_needs_rebuild(TRUE);
+}
