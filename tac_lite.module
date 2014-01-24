@@ -208,6 +208,7 @@ function _tac_lite_config($scheme) {
   // Merge defaults, for backward compatibility.
   $config += array(
     'term_visibility' => (isset($config['perms']['grant_view']) && $config['perms']['grant_view']),
+    'unpublished' => FALSE,
   );
 
   // For backward compatability, use naming convention for scheme 1
@@ -253,6 +254,13 @@ function tac_lite_admin_scheme_form($form, $form_state, $i) {
       '#default_value' => $config['perms'],
       '#description' => t('Select which permissions are granted by this scheme.  <br/>Note when granting update, it is best to enable visibility on all terms.  Otherwise a user may unknowingly remove invisible terms while editing a node.'),
       '#required' => FALSE,
+    );
+
+    $form['tac_lite_config_scheme_' . $i]['unpublished'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Apply to unpublished content'),
+      '#description' => t('If checked, permissions in this scheme will apply to unpublished content.  If this scheme includes the view permission, then <strong>unpublished nodes will be visible</strong> to users whose roles would grant them access to the published node.'),
+      '#default_value' => $config['unpublished'],
     );
 
     $form['tac_lite_config_scheme_' . $i]['term_visibility'] = array(
@@ -468,19 +476,22 @@ function tac_lite_node_access_records($node) {
     $grants = array();
     for ($i = 1; $i <= variable_get('tac_lite_schemes', 1); $i++) {
       $config = _tac_lite_config($i);
-      foreach ($tids as $tid) {
-        $grant = array(
-          'realm' => $config['realm'],
-          'gid' => $tid, // use term id as grant id
-          'grant_view' => 0,
-          'grant_update' => 0,
-          'grant_delete' => 0,
-          'priority' => 0,
-        );
-        foreach ($config['perms'] as $perm) {
-          $grant[$perm] = TRUE;
+      // Only apply grants to published nodes, or unpublished nodes if requested in the scheme
+      if ($node->status || $config['unpublished']) {
+        foreach ($tids as $tid) {
+          $grant = array(
+            'realm' => $config['realm'],
+            'gid' => $tid, // use term id as grant id
+            'grant_view' => 0,
+            'grant_update' => 0,
+            'grant_delete' => 0,
+            'priority' => 0,
+          );
+          foreach ($config['perms'] as $perm) {
+            $grant[$perm] = TRUE;
+          }
+          $grants[] = $grant;
         }
-        $grants[] = $grant;
       }
     }
     return $grants;
@@ -501,6 +512,17 @@ function _tac_lite_get_terms($node) {
   // Get the vids that tac_lite cares about
   $vids = variable_get('tac_lite_categories', NULL);
   if ($vids) {
+    // Load all terms found in term reference fields.
+    $terms_by_vid = tac_lite_node_get_terms($node);
+    foreach ($terms_by_vid as $vid => $terms) {
+      if (!empty($terms)) {
+        foreach ($terms as $tid => $term) {
+          $tids[$tid] = $tid;
+        }
+      }
+    }
+
+    // We should have all terms already, but just in case...
     // Query for all tids assigned to this node in the vids that we care about
     $query = db_select('taxonomy_index', 'r');
     $t_alias = $query->join('taxonomy_term_data', 't', 'r.tid = t.tid');
@@ -510,6 +532,13 @@ function _tac_lite_get_terms($node) {
     $query->condition("t.vid", $vids, 'IN');
     $result = $query->execute();
     foreach ($result as $term) {
+      if (empty($tids[$term->tid])) {
+        watchdog('tac_lite', 'Unexpected term id %tid associated with !node.  Please report this to !url.', array(
+            '%tid' => $term->tid,
+            '!node' => l($node->title, 'node/' . $node->nid),
+            '!url' => 'https://drupal.org/node/1918272',
+          ), WATCHDOG_DEBUG);
+      }
       $tids[$term->tid] = $term->tid;
     }
   }
@@ -524,18 +553,39 @@ function _tac_lite_get_terms($node) {
 }
 
 /**
- * Is this used? It will need the same updates as _tac_lite_get_terms
- * @param unknown_type $nid
+ * In Drupal 6.x, there was taxonomy_node_get_terms().  Drupal 7.x should
+ * provide the same feature, but doesn't.  Here is our workaround, based on
+ * https://drupal.org/comment/5573176#comment-5573176.
+ *
+ * We organize our data structure by vid and tid.
  */
-function _tac_lite_get_terms_by_nid($nid) {
-  $tids = array();
-  $terms = taxonomy_node_get_terms($nid);
+function tac_lite_node_get_terms($node) {
+  $terms = &drupal_static(__FUNCTION__);
 
-  // terms is now an array of objects. We convert to a simple array of tids
-  foreach ($terms as $term) {
-    $tids[$term->tid] = $term->tid;
+  if (!isset($terms[$node->nid])) {
+    // Get tids from all taxonomy_term_reference fields.
+    $fields = field_info_fields();
+    foreach ($fields as $field_name => $field) {
+      // Our goal is to get all terms, regardless of language, associated with the node.  Does the code below do that?
+      if ($field['type'] == 'taxonomy_term_reference' && field_info_instance('node', $field_name, $node->type)) {
+        if (($items = field_get_items('node', $node, $field_name)) && is_array($items)) {
+          foreach ($items as $item) {
+            // Sometimes $item contains only tid, sometimes entire term.  Thanks Drupal for remaining mysterious!
+            // We need to term to determine the vocabulary id.
+            if (!empty($item['taxonomy_term'])) {
+              $term = $item['taxonomy_term'];
+            }
+            else {
+              $term = taxonomy_term_load($item['tid']);
+            }
+            $terms[$node->nid][$term->vid][$term->tid] = $term;
+          }
+        }
+      }
+    }
   }
-  return $tids;
+
+  return isset($terms[$node->nid]) ? $terms[$node->nid] : FALSE;
 }
 
 /**
