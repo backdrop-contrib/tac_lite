@@ -514,10 +514,12 @@ function _tac_lite_get_terms($node) {
   if ($vids) {
     // Load all terms found in term reference fields.
     $terms_by_vid = tac_lite_node_get_terms($node);
-    foreach ($terms_by_vid as $vid => $terms) {
-      if (!empty($terms)) {
-        foreach ($terms as $tid => $term) {
-          $tids[$tid] = $tid;
+    if (!empty($terms_by_vid)) {
+      foreach ($terms_by_vid as $vid => $terms) {
+        if (!empty($terms)) {
+          foreach ($terms as $tid => $term) {
+            $tids[$tid] = $tid;
+          }
         }
       }
     }
@@ -578,7 +580,9 @@ function tac_lite_node_get_terms($node) {
             else {
               $term = taxonomy_term_load($item['tid']);
             }
-            $terms[$node->nid][$term->vid][$term->tid] = $term;
+            if ($term) {
+              $terms[$node->nid][$term->vid][$term->tid] = $term;
+            }
           }
         }
       }
