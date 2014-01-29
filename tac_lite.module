@@ -509,23 +509,26 @@ function tac_lite_node_access_records($node) {
 function _tac_lite_get_terms($node) {
   $tids = array();
 
-  // Get the vids that tac_lite cares about
+  // Get the vids that tac_lite cares about.
   $vids = variable_get('tac_lite_categories', NULL);
   if ($vids) {
     // Load all terms found in term reference fields.
+    // This logic should work for all nodes (published or not).
     $terms_by_vid = tac_lite_node_get_terms($node);
     if (!empty($terms_by_vid)) {
-      foreach ($terms_by_vid as $vid => $terms) {
-        if (!empty($terms)) {
-          foreach ($terms as $tid => $term) {
+      foreach ($vids as $vid) {
+        if (!empty($terms_by_vid[$vid])) {
+          foreach ($terms_by_vid[$vid] as $tid => $term) {
             $tids[$tid] = $tid;
           }
         }
       }
     }
 
-    // We should have all terms already, but just in case...
-    // Query for all tids assigned to this node in the vids that we care about
+    // The logic above should have all terms already, but just in case we use
+    // the "original" logic below.  The taxonomy module stopped writing to the
+    // taxonomy_index for unpublished nodes, so this works only for published
+    // nodes.
     $query = db_select('taxonomy_index', 'r');
     $t_alias = $query->join('taxonomy_term_data', 't', 'r.tid = t.tid');
     $v_alias = $query->join('taxonomy_vocabulary', 'v', 't.vid = v.vid');
