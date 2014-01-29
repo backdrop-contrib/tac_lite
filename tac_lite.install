@@ -106,3 +106,13 @@ function tac_lite_update_7001() {
       )));
   node_access_needs_rebuild(TRUE);
 }
+
+/**
+ * Rebuild node_access permissions, for sites upgrading from tac_lite 1.0 (or
+ * 1.1) to 1.2.  This will fix a bug in which some nodes were erroneously added
+ * to the node_access table.  You will be prompted to rebuild access permissions
+ * after the update process is complete. (See the status report page.)
+ */
+function tac_lite_update_7002() {
+  node_access_needs_rebuild(TRUE);
+}
