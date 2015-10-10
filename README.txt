@@ -1,12 +1,18 @@
-VERSION: CVS HEAD, compatible with D7, dev release use at own risk.
+VERSION: 7.x-1.x development build
 
 OVERVIEW
 --------
 
 Tac_lite stands for Taxonomy Access Control Lite.  This module
-restricts access so that some users may see content that is
+grants access so that some users may see content that is
 hidden from others.  A simple scheme based on taxonomy, roles and
 users controls which content is hidden.
+
+Bear in mind that, like all modules which use Drupal's built-in
+node_access features, this module does not prevent users from
+viewing/editing nodes which Drupal's permission allow them to
+view/edit. To use, configure Drupal to not grant the permission, then
+configure tac_lite to grant it.
 
 As the name implies, this module shares some functionality with an
 earlier module called Taxonomy Access Control (TAC).  If you are
@@ -19,9 +25,9 @@ Here are some key features of tac_lite:
 
 * Designed to be as simple as possible in installation and administration.
 
-* Uses Drupal's node_access table, db_rewrite_sql hook and
-  taxonomy module to leave the smallest possible footprint while doing
-  it's job.  For example, it introduces no new database tables.
+* Uses Drupal's node_access hooks and taxonomy module to leave the
+  smallest possible footprint while doing it's job.  For example, it
+  introduces no new database tables.
 
 * Grant permissions based on roles.
 
