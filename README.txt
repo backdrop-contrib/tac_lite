@@ -6,6 +6,10 @@ test and create issues. Hopefully, we can find someone who can get this
 running.
 https://backdropcms.org/project/coder_upgrade
 
+Resources:
+https://api.backdropcms.org/converting-modules-from-drupal
+https://api.backdropcms.org/converting-from-drupal#communicate
+
 ## OVERVIEW
 
 Tac_lite stands for Taxonomy Access Control Lite.  This module
