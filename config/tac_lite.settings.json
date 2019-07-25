@@ -1,0 +1,9 @@
+{
+    "_config_name": "tac_lite.settings",
+    "tac_lite_schemes": "1",
+    "tac_lite_config_scheme_i": "dynamic variable in file /tac_lite/tac_lite.module line 78",
+    "tac_lite_categories": "dynamic value in file /tac_lite/tac_lite_create.module line 25",
+    "tac_lite_config_scheme_scheme": "dynamic variable in file /tac_lite/tac_lite.module line 202",
+    "tac_lite_grants_scheme_i": "dynamic variable in file /tac_lite/tac_lite.module line 286",
+    "tac_lite_grants_scheme_scheme": "dynamic variable in file /tac_lite/tac_lite.module line 648"
+}
