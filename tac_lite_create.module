@@ -2,17 +2,28 @@
 /**
  * @file
  * Use tac_lite to control which terms can be used when creating new
- * content.  Unlike tac_lite.module, which relies on Drupal's node_access
+ * content.  Unlike tac_lite.module, which relies on Backdrop's node_access
  * features, this module uses hook_form_alter to change which terms are
  * presented by the taxonomy module.
  *
- * Original implementation by markDrupal http://drupal.org/user/93970.
+ * Original implementation by markBackdrop http://drupal.org/user/93970.
  */
 
 /**
- * Implementation of hook_form_alter().
+ * Implements hook_config_info().
+ */
+function tac_lite_create_config_info() {
+  $prefixes['tac_lite.settings'] = array(
+    'label' => t('Module name settings'),
+    'group' => t('Configuration'),
+  );
+}
+
+/**
+ * Implements hook_form_alter().
  */
 function tac_lite_create_form_alter(&$form, $form_state, $form_id) {
+  $config = config('tac_lite.settings');
   if (strpos($form_id, 'node_form') !== FALSE) {
     global $user;
 
@@ -22,11 +33,11 @@ function tac_lite_create_form_alter(&$form, $form_state, $form_id) {
     }
 
     // the vocabularies containing protected info.
-    $vids = variable_get('tac_lite_categories', array(0));
+    $vids = $config->get('tac_lite_categories');
 
     // the terms this user is allowed to edit
     $tids = array();
-    for ($i = 1; $i <= variable_get('tac_lite_schemes', 1); $i++) {
+    for ($i = 1; $i <= $config->get('tac_lite_schemes'); $i++) {
       $config = _tac_lite_config($i);
       if ((isset($config['tac_lite_create']) && $config['tac_lite_create']) ||
         in_array('grant_update', $config['perms'])) {
@@ -37,7 +48,7 @@ function tac_lite_create_form_alter(&$form, $form_state, $form_id) {
     // Go through all of the fields in the system to find the ones we want use
     $term_fields = array();
     $info = field_info_fields();
-    foreach($info as $key => $value){
+    foreach ($info as $key => $value) {
       // First check for taxonomy_term_reference fields.
       if ($value['type'] == 'taxonomy_term_reference') {
         // Then check to see if they are associated with this node type (entity bundle).
@@ -51,7 +62,7 @@ function tac_lite_create_form_alter(&$form, $form_state, $form_id) {
     }
 
     // Now that we have the names of the fields, go through each one in the form.
-    foreach($term_fields as $field_name => $vocab_name) {
+    foreach ($term_fields as $field_name => $vocab_name) {
       // Get the language key so we can find the correct element in the field.
       $field_language = $form[$field_name]['#language'];
 
@@ -61,7 +72,7 @@ function tac_lite_create_form_alter(&$form, $form_state, $form_id) {
       }
 
       // Skip auto complete fields as they are not supported.
-      if ($form[$field_name][$field_language]['#type'] != 'select' && $form[$field_name][$field_language]['#type'] != 'radios'){
+      if ($form[$field_name][$field_language]['#type'] != 'select' && $form[$field_name][$field_language]['#type'] != 'radios') {
         continue;
       }
 
@@ -69,7 +80,7 @@ function tac_lite_create_form_alter(&$form, $form_state, $form_id) {
       $v = taxonomy_vocabulary_machine_name_load($vocab_name);
 
       // We only want to act on this field if it is tied to a vocabulary we are set to control.
-      if(!in_array($v->vid, $vids)) {
+      if (!in_array($v->vid, $vids)) {
         continue;
       }
 
@@ -95,22 +106,21 @@ function tac_lite_create_form_alter(&$form, $form_state, $form_id) {
 
       // If there are no options left, but this field is required then throw a 404.
       if (count($form[$field_name][$field_language]['#options']) == 0 && !empty($form[$field_name]['#required'])) {
-        drupal_set_message(t('You have no permissions to add content to the required %name vocabulary. Please contact the site administrator if you believe you should have permission to add content.', array('%name' => $form[$field_name]['#title'])));
-        drupal_access_denied();
+        backdrop_set_message(t('You have no permissions to add content to the required %name vocabulary. Please contact the site administrator if you believe you should have permission to add content.', array('%name' => $form[$field_name]['#title'])));
+        backdrop_access_denied();
         exit();
       }
 
       // Don't show if the only option left is <none>.
-      if (empty($form[$field_name][$field_language]['#options']) ||
-          (count($form[$field_name][$field_language]['#options']) == 1 && isset($form[$field_name][$field_language]['#options']['_none']))) {
+      if (count($form[$field_name][$field_language]['#options']) <= 1) {
         $form[$field_name]['#access'] = FALSE;
       }
       // HELP: Is size deprecated?
       /*
-      if (isset($form[$field_name]['#size']) && $form[$field_name]['#size'] > count($form['taxonomy'][$field_language]['#options'])) {
-        $form[$field_name]['#size'] = count($form[$field_name][$field_language]['#options']);
-      }
-      */
+       if (isset($form[$field_name]['#size']) && $form[$field_name]['#size'] > count($form['taxonomy'][$field_language]['#options'])) {
+       $form[$field_name]['#size'] = count($form[$field_name][$field_language]['#options']);
+       }
+       */
     }
   }
   elseif ($form_id == 'tac_lite_admin_scheme_form') {

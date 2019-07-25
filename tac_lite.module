@@ -7,31 +7,31 @@
  */
 
 /**
- * Implementation of hook_help().
+ * Implements hook_help().
  */
 function tac_lite_help($section) {
   switch ($section) {
     case 'admin/help#tac_lite':
       // $output .= '<p>' . t('') . '</p>';
       $output = '<p>' . t('Taxonomy Access Control Lite allows you to restrict access to site content. It uses a simple scheme based on Taxonomy, Users and Roles.') . '</p>';
-      $output .= '<p>' . t('This module leverages Drupal\'s node_access table allows this module to grant permission to view, update, and delete nodes.  To control which users can <em>create</em> new nodes, use Drupal\'s role based permissions.') . '</p>';
-      $output .= '<p>' . t('It is important to understand that this module <em>grants</em> privileges, as opposed to <em>revoking</em> privileges.  So, use Drupal\'s built-in permissions to hide content from certain roles, then use this module to show the content.  This module cannot hide content that the user is allowed to see based on their existing privileges.') . '</p>';
-$output .= '<p>' . t('There are several steps required to set up Taxonomy Access Control Lite.') . '</p>';
+      $output .= '<p>' . t('This module leverages Backdrop\'s node_access table allows this module to grant permission to view, update, and delete nodes.  To control which users can <em>create</em> new nodes, use Backdrop\'s role based permissions.') . '</p>';
+      $output .= '<p>' . t('It is important to understand that this module <em>grants</em> privileges, as opposed to <em>revoking</em> privileges.  So, use Backdrop\'s built-in permissions to hide content from certain roles, then use this module to show the content.  This module cannot hide content that the user is allowed to see based on their existing privileges.') . '</p>';
+      $output .= '<p>' . t('There are several steps required to set up Taxonomy Access Control Lite.') . '</p>';
       $output .= '<ol>';
       $output .= '<li>' . t('Define one or more vocabularies whose terms will control which users have access. For example, you could define a vocabulary called \'Privacy\' with terms \'Public\' and \'Private\'.') . '</li>';
       $output .= '<li>' . t('Tell this module which vocabularies control privacy. (!link)', array('!link' => l(t('administer -> people -> access control by taxonomy'), 'admin/people/access/tac_lite'))) . '</li>';
       $output .= '<li>' . t('Configure one or more <em>schemes</em>.   simple site may need only one scheme which grants view permission.  A more complex site might require additional schemes for update and delete.  Each scheme associates roles and terms.  Users will be granted priviliges based on their role and the terms with which nodes are tagged.') . '</li>';
       $output .= '<li>' . t('When settings are correct, <a href=!url>rebuild node_access permissions</a>.', array(
-                   '!url' => url('admin/reports/status/rebuild'),
-                 )) . '</li>';
+        '!url' => url('admin/reports/status/rebuild'),
+      )) . '</li>';
       $output .= '<li>' . t('Optionally, grant access to individual users. (See the <em>access by taxonomy</em> tab, under user -> edit.)') . '</li>';
       $output .= '</ol>';
       $output .= '<p>' . t('Troubleshooting:.') . '<ul>';
       $output .= '<li>' . t('Try rebuilding node_access permissions.') . '</li>';
       $output .= '<li>' . t('Try disabling tac_lite.module, rebuilding permissions.  With the module disabled, users should not have the privileges you are attempting to grant with this module.') . '</li>';
-      $output .= '<li>' . t('The devel_node_access.module (part of <a href=!url>devel</a>) helps to see exactly what Drupal\'s node_access table is doing.', array(
-                   '!url' => 'http://drupal.org/project/devel',
-                 )) . '</li>';
+      $output .= '<li>' . t('The devel_node_access.module (part of <a href=!url>devel</a>) helps to see exactly what Backdrop\'s node_access table is doing.', array(
+        '!url' => 'http://drupal.org/project/devel',
+      )) . '</li>';
       $output .= '</ul></p>';
       return $output;
       break;
@@ -39,7 +39,7 @@ $output .= '<p>' . t('There are several steps required to set up Taxonomy Access
 }
 
 /**
- * Implementation of hook_perm().
+ * Implements hook_perm().
  */
 function tac_lite_permission() {
   return array(
@@ -51,16 +51,27 @@ function tac_lite_permission() {
 }
 
 /**
- * Implementation of hook_menu().
+ * Implements hook_config_info().
+ */
+function tac_lite_create_config_info() {
+  $prefixes['tac_lite.settings'] = array(
+    'label' => t('Module name settings'),
+    'group' => t('Configuration'),
+  );
+}
+
+/**
+ * Implements hook_menu().
  */
 function tac_lite_menu() {
+  $config = config('tac_lite.settings');
   global $user;
   $items = array();
 
   $items['admin/config/people/tac_lite'] = array(
     'title' => 'Access by Taxonomy',
     'description' => "taxonomy-based permissions by tac_lite",
-    'page callback' => 'drupal_get_form',
+    'page callback' => 'backdrop_get_form',
     'page arguments' => array('tac_lite_admin_settings'),
     'weight' => 1, // after 'roles' tab
     'access arguments' => array('administer tac_lite'),
@@ -73,18 +84,19 @@ function tac_lite_menu() {
     'access arguments' => array('administer tac_lite'),
   );
 
-  $schemes = variable_get('tac_lite_schemes', 1);
+  $schemes = $config->get('tac_lite_schemes');
   for ($i = 1; $i <= $schemes; $i++) {
-    $scheme = variable_get('tac_lite_config_scheme_'. $i, FALSE);
+    $scheme = $config->get('tac_lite_config_scheme_' . $i);
     if ($scheme) {
       $title = $scheme['name'];
-    } else {
+    }
+    else {
       $title = "Scheme $i";
     }
     $items['admin/config/people/tac_lite/scheme_' . $i] = array(
       'title' => $title,
       'page callback' => 'tac_lite_admin_settings_scheme',
-      'page arguments' => array((string)$i),
+      'page arguments' => array((string) $i),
       'type' => MENU_LOCAL_TASK,
       'weight' => $i,
       'access arguments' => array('administer tac_lite'),
@@ -98,6 +110,7 @@ function tac_lite_menu() {
  * Returns the settings form
  */
 function tac_lite_admin_settings($form, &$form_state) {
+  $config = config('tac_lite.settings');
   $vocabularies = taxonomy_get_vocabularies();
 
   if (!count($vocabularies)) {
@@ -114,10 +127,11 @@ function tac_lite_admin_settings($form, &$form_state) {
       $options[$vid] = $vocab->name;
     }
 
+    $form['#config'] = 'tac_lite.settings';
     $form['tac_lite_categories'] = array(
       '#type' => 'select',
       '#title' => t('Vocabularies'),
-      '#default_value' => variable_get('tac_lite_categories', NULL),
+      '#default_value' => $config->get('tac_lite_categories'),
       '#options' => $options,
       '#description' => t('Select one or more vocabularies to control privacy.  <br/>Use caution with hierarchical (nested) taxonomies as <em>visibility</em> settings may cause problems on node edit forms.<br/>Do not select free tagging vocabularies, they are not supported.'),
       '#multiple' => TRUE,
@@ -127,13 +141,14 @@ function tac_lite_admin_settings($form, &$form_state) {
     $scheme_options = array();
     // Currently only view, edit, delete permissions possible, so 7
     // permutations will be more than enough.
-    for ($i = 1; $i < 8; $i++)
+    for ($i = 1; $i < 8; $i++) {
       $scheme_options[$i] = $i;
+    }
     $form['tac_lite_schemes'] = array(
       '#type' => 'select',
       '#title' => t('Number of Schemes'),
       '#description' => t('Each scheme allows for a different set of permissions.  For example, use scheme 1 for read-only permission; scheme 2 for read and update; scheme 3 for delete; etc.  Additional schemes increase the size of your node_access table, so use no more than you need.'),
-      '#default_value' => variable_get('tac_lite_schemes', 1),
+      '#default_value' => $config->get('tac_lite_schemes'),
       '#options' => $scheme_options,
       '#required' => TRUE,
     );
@@ -157,7 +172,7 @@ function tac_lite_admin_settings($form, &$form_state) {
 /**
  * This form submit callback ensures that the form values are saved, and also
  * the node access database table is rebuilt.
- * 2008 : Modified by Paulo to be compliant with drupal 6
+ * 2008 : Modified by Paulo to be compliant with backdrop 6
  */
 function _tac_lite_admin_settings_submit($form, &$form_state) {
   $rebuild = $form_state['values']['tac_lite_rebuild'];
@@ -167,15 +182,15 @@ function _tac_lite_admin_settings_submit($form, &$form_state) {
     node_access_rebuild(TRUE);
   }
   else {
-    drupal_set_message(t('Do not forget to <a href=!url>rebuild node access permissions</a> after you have configured taxonomy-based access.', array(
-                           '!url' => url('admin/reports/status/rebuild'),
-                         )), 'warning');
+    backdrop_set_message(t('Do not forget to <a href=!url>rebuild node access permissions</a> after you have configured taxonomy-based access.', array(
+      '!url' => url('admin/reports/status/rebuild'),
+    )), 'warning');
   }
 
   // And rebuild menus, in case the number of schemes has changed.
   menu_rebuild();
 
-  variable_del('tac_lite_rebuild'); // We don't need to store this as a system variable.
+  config_clear('tac_lite.settings', 'tac_lite_rebuild'); // We don't need to store this as a system variable.
 }
 
 /**
@@ -184,25 +199,20 @@ function _tac_lite_admin_settings_submit($form, &$form_state) {
  *   The index of the scheme that we will be creating a form for. Passed in as a page argument from the menu.
  */
 function tac_lite_admin_settings_scheme($i) {
-  return drupal_get_form('tac_lite_admin_scheme_form', $i);
+  return backdrop_get_form('tac_lite_admin_scheme_form', $i);
 }
 
 /**
  * helper function
  */
 function _tac_lite_config($scheme) {
+  $config = config('tac_lite.settings');
   // different defaults for scheme 1
   if ($scheme === 1) {
-    $config = variable_get('tac_lite_config_scheme_' . $scheme, array(
-                'name' => t('read'),
-                'perms' => array('grant_view'),
-              ));
+    $config = $config->get('tac_lite_config_scheme_' . $scheme);
   }
   else {
-    $config = variable_get('tac_lite_config_scheme_' . $scheme, array(
-                'name' => NULL,
-                'perms' => array(),
-              ));
+    $config = $config->get('tac_lite_config_scheme_' . $scheme);
   }
 
   // Merge defaults, for backward compatibility.
@@ -226,12 +236,14 @@ function _tac_lite_config($scheme) {
  * Returns the form for role-based privileges.
  */
 function tac_lite_admin_scheme_form($form, $form_state, $i) {
-  $vids = variable_get('tac_lite_categories', NULL);
+  $config = config('tac_lite.settings');
+  $vids = $config->get('tac_lite_categories');
   $roles = user_roles();
 
   $config = _tac_lite_config($i);
   $form['#tac_lite_config'] = $config;
   if (count($vids)) {
+    $form['#config'] = 'tac_lite.settings';
     $form['tac_lite_config_scheme_' . $i] = array('#tree' => TRUE);
     $form['tac_lite_config_scheme_' . $i]['name'] = array(
       '#type' => 'textfield',
@@ -283,7 +295,7 @@ function tac_lite_admin_scheme_form($form, $form_state, $i) {
       '#suffix' => '</p>',
     );
     $vocabularies = taxonomy_get_vocabularies();
-    $all_defaults = variable_get('tac_lite_grants_scheme_' . $i, array());
+    $all_defaults = $config->get('tac_lite_grants_scheme_' . $i);
     $form['tac_lite_grants_scheme_' . $i] = array('#tree' => TRUE);
     foreach ($roles as $rid => $role_name) {
       $form['tac_lite_grants_scheme_' . $i][$rid] = array(
@@ -326,8 +338,10 @@ function tac_lite_admin_scheme_form($form, $form_state, $i) {
   else {
     $form['tac_lite_help'] = array(
       '#type' => 'markup',
-      '#prefix' => '<p>', '#suffix' => '</p>',
-      '#markup' => t('First, select one or more vocabularies on the <a href=!url>settings tab</a>. Then, return to this page to complete configuration.', array('!url' => url('admin/config/people/tac_lite/settings'))));
+      '#prefix' => '<p>',
+      '#suffix' => '</p>',
+      '#markup' => t('First, select one or more vocabularies on the <a href=!url>settings tab</a>. Then, return to this page to complete configuration.', array('!url' => url('admin/config/people/tac_lite/settings'))),
+    );
     return $form;
   }
 }
@@ -336,6 +350,7 @@ function tac_lite_admin_scheme_form($form, $form_state, $i) {
  * Submit function for admin settings form to rebuild the menu.
  */
 function tac_lite_admin_scheme_form_submit($form, &$form_state) {
+  // TODO This variable was probably removed in Backdrop without replacement.
   variable_set('menu_rebuild_needed', TRUE);
 
   // Rebuild the node_access table.
@@ -343,15 +358,15 @@ function tac_lite_admin_scheme_form_submit($form, &$form_state) {
     node_access_rebuild(TRUE);
   }
   else {
-    drupal_set_message(t('Do not forget to <a href=!url>rebuild node access permissions</a> after you have configured taxonomy-based access.', array(
-                           '!url' => url('admin/reports/status/rebuild'),
-                         )), 'warning');
+    backdrop_set_message(t('Do not forget to <a href=!url>rebuild node access permissions</a> after you have configured taxonomy-based access.', array(
+      '!url' => url('admin/reports/status/rebuild'),
+    )), 'warning');
   }
-  variable_del('tac_lite_rebuild'); // We don't need to store this as a system variable.
+  config_clear('tac_lite.settings', 'tac_lite_rebuild'); // We don't need to store this as a system variable.
 }
 
 /**
- * Implementation of hook_user_categories
+ * Implements hook_user_categories().
  *
  * Creates the user edit category form for tac_lite's user-specific permissions under user/edit
  */
@@ -368,24 +383,25 @@ function tac_lite_user_categories() {
 }
 
 /**
- * Implementation of hook_form_alter().
+ * Implements hook_form_alter().
  *
  * @param $form
  *   Nested array of form elements that comprise the form.
  * @param $form_state
- *   A keyed array containing the current state of the form. The arguments that drupal_get_form() was originally called with are available in the array $form_state['build_info']['args'].
+ *   A keyed array containing the current state of the form. The arguments that backdrop_get_form() was originally called with are available in the array $form_state['build_info']['args'].
  * @param $form_id
  *   String representing the name of the form itself. Typically this is the name of the function that generated the form.
  *
  */
-function tac_lite_form_alter(&$form, &$form_state, $form_id){
+function tac_lite_form_alter(&$form, &$form_state, $form_id) {
+  $config = config('tac_lite.settings');
   // Catch for the tac_lite category on the user edit form.
   if ($form_id == 'user_profile_form') {
     if ($form['#user_category'] == 'tac_lite') {
       $vocabularies = taxonomy_get_vocabularies();
-      $vids = variable_get('tac_lite_categories', NULL);
+      $vids = $config->get('tac_lite_categories');
       if (count($vids)) {
-        for ($i = 1; $i <= variable_get('tac_lite_schemes', 1); $i++) {
+        for ($i = 1; $i <= $config->get('tac_lite_schemes'); $i++) {
           $config = _tac_lite_config($i);
           if ($config['name']) {
             $perms = $config['perms'];
@@ -431,7 +447,7 @@ function tac_lite_form_alter(&$form, &$form_state, $form_id){
 }
 
 /**
- * Implementation of hook_user_presave().
+ * Implements hook_user_presave().
  *
  * Move the tac_lite data into the data object
  * @param $edit
@@ -443,9 +459,9 @@ function tac_lite_form_alter(&$form, &$form_state, $form_id){
  */
 function tac_lite_user_presave(&$edit, $account, $category) {
   // Only proceed if we are in the tac_lite category.
-  if ($category == 'tac_lite'){
+  if ($category == 'tac_lite') {
     // Go through each scheme and copy the form value into the data element
-    for ($i = 1; $i <= variable_get('tac_lite_schemes', 1); $i++) {
+    for ($i = 1; $i <= config_get('tac_lite.settings', 'tac_lite_schemes'); $i++) {
       $config = _tac_lite_config($i);
       if ($config['name']) {
         $edit['data'][$config['realm']] = $edit[$config['realm']];
@@ -468,13 +484,13 @@ function tac_lite_node_access_records($node) {
   if (!count($tids)) {
     // no relevant terms found.
 
-    // in drupal 4-7 we had to write a row into the database. In drupal 5 and later, it should be safe to do nothing.
+    // in backdrop 4-7 we had to write a row into the database. In backdrop 5 and later, it should be safe to do nothing.
   }
   else {
     // if we're here, the node has terms associated with it which restrict
     // access to the node.
     $grants = array();
-    for ($i = 1; $i <= variable_get('tac_lite_schemes', 1); $i++) {
+    for ($i = 1; $i <= config_get('tac_lite.settings', 'tac_lite_schemes'); $i++) {
       $config = _tac_lite_config($i);
       // Only apply grants to published nodes, or unpublished nodes if requested in the scheme
       if ($node->status || $config['unpublished']) {
@@ -510,7 +526,7 @@ function _tac_lite_get_terms($node) {
   $tids = array();
 
   // Get the vids that tac_lite cares about.
-  $vids = variable_get('tac_lite_categories', NULL);
+  $vids = config_get('tac_lite.settings', 'tac_lite_categories');
   if ($vids) {
     // Load all terms found in term reference fields.
     // This logic should work for all nodes (published or not).
@@ -539,33 +555,33 @@ function _tac_lite_get_terms($node) {
     foreach ($result as $term) {
       if (empty($tids[$term->tid])) {
         watchdog('tac_lite', 'Unexpected term id %tid associated with !node.  Please report this to !url.', array(
-            '%tid' => $term->tid,
-            '!node' => l($node->title, 'node/' . $node->nid),
-            '!url' => 'https://drupal.org/node/1918272',
-          ), WATCHDOG_DEBUG);
+          '%tid' => $term->tid,
+          '!node' => l($node->title, 'node/' . $node->nid),
+          '!url' => 'https://drupal.org/node/1918272',
+        ), WATCHDOG_DEBUG);
       }
       $tids[$term->tid] = $term->tid;
     }
   }
   elseif (user_access('administer tac_lite')) {
-    drupal_set_message(t('tac_lite.module enabled, but not <a href=!admin_url>configured</a>. No tac_lite terms associated with %title.', array(
-                           '!admin_url' => url('admin/config/people/tac_lite'),
-                           '%title' => $node->title,
-                         )));
+    backdrop_set_message(t('tac_lite.module enabled, but not <a href=!admin_url>configured</a>. No tac_lite terms associated with %title.', array(
+      '!admin_url' => url('admin/config/people/tac_lite'),
+      '%title' => $node->title,
+    )));
   }
 
   return $tids;
 }
 
 /**
- * In Drupal 6.x, there was taxonomy_node_get_terms().  Drupal 7.x should
+ * In Backdrop 6.x, there was taxonomy_node_get_terms().  Backdrop 7.x should
  * provide the same feature, but doesn't.  Here is our workaround, based on
  * https://drupal.org/comment/5573176#comment-5573176.
  *
  * We organize our data structure by vid and tid.
  */
 function tac_lite_node_get_terms($node) {
-  $terms = &drupal_static(__FUNCTION__);
+  $terms = &backdrop_static(__FUNCTION__);
 
   if (!isset($terms[$node->nid])) {
     // Get tids from all taxonomy_term_reference fields.
@@ -575,7 +591,7 @@ function tac_lite_node_get_terms($node) {
       if ($field['type'] == 'taxonomy_term_reference' && field_info_instance('node', $field_name, $node->type)) {
         if (($items = field_get_items('node', $node, $field_name)) && is_array($items)) {
           foreach ($items as $item) {
-            // Sometimes $item contains only tid, sometimes entire term.  Thanks Drupal for remaining mysterious!
+            // Sometimes $item contains only tid, sometimes entire term.  Thanks Backdrop for remaining mysterious!
             // We need to term to determine the vocabulary id.
             if (!empty($item['taxonomy_term'])) {
               $term = $item['taxonomy_term'];
@@ -645,7 +661,7 @@ function _tac_lite_user_tids($account, $scheme) {
   }
 
   // add per-role grants in addition to per-user grants
-  $defaults = variable_get('tac_lite_grants_scheme_' . $scheme, array());
+  $defaults = config_get('tac_lite.settings', 'tac_lite_grants_scheme_' . $scheme);
   foreach ($account->roles as $rid => $role_name) {
     if (isset($defaults[$rid]) && count($defaults[$rid])) {
       foreach ($defaults[$rid] as $tids) {
@@ -665,14 +681,14 @@ function _tac_lite_user_tids($account, $scheme) {
 }
 
 /**
- * Implementation of hook_node_grants().
+ * Implements hook_node_grants().
  *
  * Returns any grants which may give the user permission to perform the
  * requested op.
  */
 function tac_lite_node_grants($account, $op) {
   $grants = array();
-  for ($i = 1; $i <= variable_get('tac_lite_schemes', 1); $i++) {
+  for ($i = 1; $i <= config_get('tac_lite.settings', 'tac_lite_schemes'); $i++) {
     $config = _tac_lite_config($i);
     if (in_array('grant_' . $op, $config['perms'])) {
       $grants[$config['realm']] = _tac_lite_user_tids($account, $i);
@@ -690,6 +706,7 @@ function tac_lite_node_grants($account, $op) {
  * to remove any terms that this user should not be able to see.
  */
 function tac_lite_query_term_access_alter(QueryAlterableInterface $query) {
+  $config = config('tac_lite.settings');
   global $user;
 
   // If this user has administer rights, don't filter
@@ -698,8 +715,8 @@ function tac_lite_query_term_access_alter(QueryAlterableInterface $query) {
   }
 
   // Get our vocabularies and schemes from variables. Return if we have none.
-  $vids = variable_get('tac_lite_categories', NULL);
-  $schemes = variable_get('tac_lite_schemes', 1);
+  $vids = $config->get('tac_lite_categories');
+  $schemes = $config->get('tac_lite_schemes');
   if (!$vids || !count($vids) || !$schemes) {
     return;
   }
@@ -719,7 +736,7 @@ function tac_lite_query_term_access_alter(QueryAlterableInterface $query) {
     // HELP: What is the proper way to find the alias of the primary table here?
     $primary_table = '';
     $t = $query->getTables();
-    foreach($t as $key => $info) {
+    foreach ($t as $key => $info) {
       if (!$info['join type']) {
         $primary_table = $info['alias'];
       }
