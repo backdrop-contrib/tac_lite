@@ -1,18 +1,17 @@
-VERSION: 7.x-1.x development build
+# TAC LITE
 
-OVERVIEW
---------
+NOTE: This module has been run through the Coder Upgrader and nothing 
+more. It is throwing errors and is NOT stabile. Please, feel free to
+test and create issues. Hopefully, we can find someone who can get this
+running.
+https://backdropcms.org/project/coder_upgrade
+
+## OVERVIEW
 
 Tac_lite stands for Taxonomy Access Control Lite.  This module
-grants access so that some users may see content that is
+restricts access so that some users may see content that is
 hidden from others.  A simple scheme based on taxonomy, roles and
 users controls which content is hidden.
-
-Bear in mind that, like all modules which use Drupal's built-in
-node_access features, this module does not prevent users from
-viewing/editing nodes which Drupal's permission allow them to
-view/edit. To use, configure Drupal to not grant the permission, then
-configure tac_lite to grant it.
 
 As the name implies, this module shares some functionality with an
 earlier module called Taxonomy Access Control (TAC).  If you are
@@ -25,9 +24,9 @@ Here are some key features of tac_lite:
 
 * Designed to be as simple as possible in installation and administration.
 
-* Uses Drupal's node_access hooks and taxonomy module to leave the
-  smallest possible footprint while doing it's job.  For example, it
-  introduces no new database tables.
+* Uses Drupal's node_access table, db_rewrite_sql hook and
+  taxonomy module to leave the smallest possible footprint while doing
+  it's job.  For example, it introduces no new database tables.
 
 * Grant permissions based on roles.
 
@@ -36,8 +35,7 @@ Here are some key features of tac_lite:
 
 * Supports view, update and delete permissions.
 
-USE CASE
---------
+## USE CASE
 
 Here's how I originally used this module.  This description might make
 it easier to understand why one might prefer tac_lite over TAC.
@@ -65,19 +63,13 @@ partners with Acme.  Their role (client or partner) controls what they
 can do, and the associations through tac_lite control what they can
 see.
 
-INSTALL
--------
-
-Enable taxonomy module.  It's required.
-
-Install this package the normal way.
-- put this file in a subdirectory of the modules directory.
-- enable using admin interface
-- no database tables to install.
+## INSTALL
 
 
-USAGE
------
+Install this module using the official Backdrop CMS instructions at
+  https://backdropcms.org/guide/modules.
+
+## USAGE
 
 Log in as an administrator. (uid==1, or a user with
 administer_tac_lite permission)
@@ -104,8 +96,7 @@ Select a term you selected when creating the node and submit changes.
 Now the user can also access the node you created.
 
 
-NOTES
------
+## NOTES
 
 If behavior of this or any other access control module seems to be
 incorrect, try rebuilding the node access table. This may be done
@@ -116,9 +107,24 @@ Another useful tool is a sub-module of the devel module, called
 devel_node_access which can give you some insight into the contents of
 your node_access table.  Recommended for troubleshooting.
 
+##CREDITS	
 
-AUTHOR
-------
+### Maintainer for Backdrop CMS
+
+Looking......
+(Temp maintainer: Tim Erickson (@stpaultim))
+
+### Ported to Backdrop by
+
+Tim Erickson (@stpaultim) with the assistance of the Coder Upgrade module.
+https://backdropcms.org/project/coder_upgrade
+
+### Maintainer for Drupal
+
+Originally created on Drupal.org by:
 
 Dave Cohen <http://drupal.org/user/18468>
 http://www.dave-cohen.com
+
+See full list of contributors:
+https://www.drupal.org/node/53738/committers
