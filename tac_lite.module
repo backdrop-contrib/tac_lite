@@ -646,7 +646,7 @@ function tac_lite_node_grants($account, $op) {
   if (!isset($grants[$account->uid][$op])) {
     $user_grants = array();
     for ($i = 1; $i <= config_get('tac_lite.settings', 'schemes'); $i++) {
-      $scheme_info = _tac_lite_config($i);
+      $scheme_info = _tac_lite_scheme_info($i);
       if (in_array('grant_' . $op, $scheme_info['perms'])) {
         $user_grants[$scheme_info['realm']] = _tac_lite_user_tids($account, $i);
       }
