@@ -261,6 +261,27 @@ function tac_lite_admin_scheme_form($form, $form_state, $i) {
       '#prefix' => '<p>',
       '#suffix' => '</p>',
     );
+
+    $form['config_scheme_' . $i]['user_terms'] = array(
+      '#type' => 'checkbox',
+      '#title' => t("Use account term reference for grants."),
+      '#default_value' => $scheme_info['user_terms'] ?? FALSE,
+      '#prefix' => '<p>',
+      '#suffix' => '</p>',
+    );
+    $form['config_scheme_' . $i]['user_terms_field'] = array(
+      '#type' => 'select',
+      '#title' => t("Term reference field"),
+      '#options' => tac_lite_get_fields_for_type('user', 'user', 'taxonomy_term_reference'),
+      '#default_value' => $scheme_info['user_terms_field'] ?? NULL,
+      '#states' => array(
+        'visible' => array(
+          ':input[name="config_scheme_' . $i . '[user_terms]"]' => array('checked' => TRUE),
+        ),
+      ),
+      '#prefix' => '<p>',
+      '#suffix' => '</p>',
+    );
     $form['helptext2'] = array(
       '#type' => 'markup',
       '#markup' => t('To grant by role, select the terms below.'),
@@ -326,6 +347,30 @@ function tac_lite_admin_scheme_form_submit($form, &$form_state) {
     )), 'warning');
   }
   config_clear('tac_lite.settings', 'rebuild'); // We don't need to store this.
+}
+
+/**
+ * Helper function to return all term reference fields for a bundle.
+ *
+ * @param string $entity_type
+ *   The entity type.
+ * @param string $bundle
+ *   The bundle name.
+ * @param string $field_type
+ *   The field type.
+ *
+ * @return array
+ *   An array of all fields of the selected type.
+ */
+function tac_lite_get_fields_for_type($entity_type, $bundle, $field_type) {
+  $instances = field_info_instances($entity_type, $bundle);
+  foreach ($instances as $instance) {
+    $field_info = field_info_field($instance['field_name']);
+    if ($field_info['type'] == $field_type) {
+      $fields[$instance['field_name']] = $instance['label'];
+    }
+  }
+  return $fields;
 }
 
 /**
@@ -630,6 +675,21 @@ function _tac_lite_user_tids($account, $scheme) {
           $grants = array_merge($grants, $tids);
         }
       }
+    }
+  }
+
+  // Use the user term field for grants.
+  if ($scheme_info['user_terms']) {
+    $field_name = $scheme_info['user_terms_field'];
+    $account = user_load($account->uid);
+    $items = field_get_items('user', $account, $field_name);
+    if (is_array($items)) {
+      foreach ($items as $tids) {
+        if (count($tids)) {
+          $ctids[] = $tids['tid'];
+        }
+      }
+      $grants = array_merge($grants, $ctids);
     }
   }
 
