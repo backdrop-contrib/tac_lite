@@ -192,6 +192,8 @@ function _tac_lite_scheme_info($scheme) {
   $scheme_info += array(
     'term_visibility' => (isset($scheme_info['perms']['grant_view']) && $scheme_info['perms']['grant_view']),
     'unpublished' => FALSE,
+    'term_parents' => FALSE,
+    'term_children' => FALSE,
   );
 
   // For backward compatability, use naming convention for scheme 1.
