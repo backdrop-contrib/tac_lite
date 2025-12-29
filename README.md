@@ -92,13 +92,15 @@ your node_access table.  Recommended for troubleshooting.
 
 ## Current Maintainers
 
- - [Laryn Kragt Bakker](https://github.com/laryn).
+ - [Laryn Kragt Bakker](https://github.com/laryn)
+ - [Martin Price](https://github.com/yorkshire-pudding)
  - Collaboration and co-maintainers welcome!
 
 ## Credits
 
  - Ported to Backdrop CMS by [Laryn Kragt Bakker](https://github.com/laryn).
- - Current development is supported by [Aten Design Group](https://aten.io).
+ - Current development is supported by [Aten Design Group](https://aten.io) and
+    [System Horizons Ltd](https://www.systemhorizons.co.uk).
  - Maintained for Drupal by [grndlvl](https://www.drupal.org/u/grndlvl),
    [jenlampton](https://www.drupal.org/u/jenlampton),
    [ikit-claw](https://www.drupal.org/u/ikit-claw), and
