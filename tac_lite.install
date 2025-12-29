@@ -44,6 +44,46 @@ function tac_lite_update_1000() {
 }
 
 /**
+ * Fix role grants for existing schemes.
+ */
+function tac_lite_update_1001() {
+  $config = config('tac_lite.settings');
+
+  // Get the role id (machine name) and role names (labels).
+  $roles = user_roles();
+
+  // Flip so we can lookup the role name.
+  $role_name_map = array_flip($roles);
+
+  // Get the number of schemes.
+  $schemes = $config->get('schemes');
+
+  // Loop through the schemes.
+  for ($i = 1; $i <= $schemes; $i++) {
+    $grants_scheme = $config->get('grants_scheme_' . $i);
+    $grants_scheme_changed = FALSE;
+
+    // Check for each role name in the scheme.
+    foreach ($role_name_map as $role_name => $role_id) {
+      if (isset($grants_scheme[$role_name])) {
+        // If the scheme is defined using role names rather than role ids then
+        // replace with role id.
+        $role_grants = $grants_scheme[$role_name];
+        unset($grants_scheme[$role_name]);
+        $grants_scheme[$role_id] = $role_grants;
+        $grants_scheme_changed = TRUE;
+      }
+    }
+
+    // If the scheme has changed set the config using the new definition.
+    if ($grants_scheme_changed) {
+      $config->set('grants_scheme_' . $i, $grants_scheme);
+    }
+  }
+  $config->save();
+}
+
+/**
  * Implements hook_update_last_removed().
  */
 function tac_lite_update_last_removed() {
