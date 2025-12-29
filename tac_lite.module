@@ -292,8 +292,8 @@ function tac_lite_admin_scheme_form($form, $form_state, $i) {
     $all_defaults = $config->get('grants_scheme_' . $i);
     $all_defaults = $all_defaults ? $all_defaults : array();
     $form['grants_scheme_' . $i] = array('#tree' => TRUE);
-    foreach ($roles as $role_name) {
-      $form['grants_scheme_' . $i][$role_name] = array(
+    foreach ($roles as $role_id => $role_name) {
+      $form['grants_scheme_' . $i][$role_id] = array(
         '#type' => 'fieldset',
         '#tree' => TRUE,
         '#title' => check_plain(t('Grant permission by role: !role', array('!role' => $role_name))),
@@ -301,14 +301,14 @@ function tac_lite_admin_scheme_form($form, $form_state, $i) {
         '#collapsible' => TRUE,
       );
 
-      $defaults = isset($all_defaults[$role_name]) ? $all_defaults[$role_name] : NULL;
+      $defaults = isset($all_defaults[$role_id]) ? $all_defaults[$role_id] : NULL;
       $has_permissions = FALSE;
       foreach ($selected_vocabularies as $selected_vocabulary) {
         $default_values = isset($defaults[$selected_vocabulary]) ? $defaults[$selected_vocabulary] : NULL;
-        $form['grants_scheme_' . $i][$role_name][$selected_vocabulary] = _tac_lite_term_select($all_vocabularies[$selected_vocabulary], $default_values);
+        $form['grants_scheme_' . $i][$role_id][$selected_vocabulary] = _tac_lite_term_select($all_vocabularies[$selected_vocabulary], $default_values);
         $has_permissions = ($has_permissions || !empty($defaults[$selected_vocabulary])) ? TRUE : FALSE;
       }
-      $form['grants_scheme_' . $i][$role_name]['#collapsed'] = !$has_permissions;
+      $form['grants_scheme_' . $i][$role_id]['#collapsed'] = !$has_permissions;
     }
 
     $form['rebuild'] = array(
@@ -668,9 +668,9 @@ function _tac_lite_user_tids($account, $scheme) {
   // Add per-role grants in addition to per-user grants.
   $defaults = config_get('tac_lite.settings', 'grants_scheme_' . $scheme);
   $defaults = $defaults ? $defaults : array();
-  foreach ($account->roles as $role_name) {
-    if (isset($defaults[$role_name]) && count($defaults[$role_name])) {
-      foreach ($defaults[$role_name] as $tids) {
+  foreach ($account->roles as $role_id) {
+    if (isset($defaults[$role_id]) && count($defaults[$role_id])) {
+      foreach ($defaults[$role_id] as $tids) {
         if (count($tids)) {
           $grants = array_merge($grants, $tids);
         }

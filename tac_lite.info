@@ -5,3 +5,6 @@ backdrop = 1.x
 package = Access control
 
 dependencies[] = taxonomy
+
+maintainers[laryn] = Laryn Kragt Bakker
+maintainers[yorkshire-pudding] = Martin Price
