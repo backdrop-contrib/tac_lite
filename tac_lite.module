@@ -191,6 +191,7 @@ function _tac_lite_scheme_info($scheme) {
   // Merge defaults, for backward compatibility.
   $scheme_info += array(
     'term_visibility' => (isset($scheme_info['perms']['grant_view']) && $scheme_info['perms']['grant_view']),
+    'term_visibility_exceptions' => array(),
     'unpublished' => FALSE,
   );
 
@@ -215,6 +216,7 @@ function tac_lite_admin_scheme_form($form, $form_state, $i) {
 
   $scheme_info = _tac_lite_scheme_info($i);
   $form['#tac_lite_scheme_info'] = $scheme_info;
+  $form['#tac_lite_scheme_id'] = $i;
   $form['#config'] = 'tac_lite.settings';
   if (count($selected_vocabularies)) {
     $form['config_scheme_' . $i] = array('#tree' => TRUE);
@@ -253,6 +255,24 @@ function tac_lite_admin_scheme_form($form, $form_state, $i) {
       '#title' => t('Visibility'),
       '#description' => t('If checked, this scheme determines whether a user can view <strong>terms</strong>.  Note the <em>view</em> permission in the select field above refers to <strong>node</strong> visibility.  This checkbox refers to <strong>term</strong> visibility, for example in a content edit form or tag cloud.'),
       '#default_value' => $scheme_info['term_visibility'],
+    );
+
+    $term_visibility_exceptions = $scheme_info['term_visibility'] ? implode(PHP_EOL, $scheme_info['term_visibility_exceptions']) : '';
+    $form['config_scheme_' . $i]['term_visibility_exceptions'] = array(
+      '#type' => 'textarea',
+      '#title' => t('Term visibility form exceptions'),
+      '#default_value' => $term_visibility_exceptions,
+      '#description' => t("By entering Form IDs into this box, these forms will be excluded from the restrictions. Enter one Form ID per line. If you are not sure how to find the Form ID you can use the <a href='@devel-form-debug-module'>Devel Form Debug module</a>. If you have more that one Scheme where 'Visibility' is enabled, you may see unexpected results unless you add the form exceptions into each Scheme.", array(
+        '@devel-form-debug-module' => 'https://backdropcms.org/project/devel_form_debug',
+      )),
+      '#states' => array(
+        'visible' => array(
+          ':input[name="config_scheme_' . $i . '[term_visibility]"]' => array('checked' => TRUE),
+        ),
+        'enabled' => array(
+          ':input[name="config_scheme_' . $i . '[term_visibility]"]' => array('checked' => TRUE),
+        ),
+      ),
     );
 
     $form['helptext'] = array(
@@ -298,6 +318,7 @@ function tac_lite_admin_scheme_form($form, $form_state, $i) {
       '#weight' => 9,
     );
 
+    $form['#submit'][] = 'tac_lite_term_visibility_exceptions_array';
     $form['#submit'][] = 'tac_lite_admin_scheme_form_submit';
     return system_settings_form($form);
   }
@@ -308,6 +329,32 @@ function tac_lite_admin_scheme_form($form, $form_state, $i) {
       '#markup' => t('First, select one or more vocabularies on the <a href=!url>settings tab</a>. Then, return to this page to complete configuration.', array('!url' => url('admin/config/people/tac_lite/settings'))));
     return $form;
   }
+}
+
+/**
+ * Convert the text box contents of term_visibility_exceptions to an array.
+ */
+function tac_lite_term_visibility_exceptions_array($form, &$form_state) {
+  // Get the Scheme ID from the form.
+  $scheme_id = $form['#tac_lite_scheme_id'];
+  // Get the relevant values submitted in the form.
+  $values = $form_state['values']['config_scheme_' . $scheme_id];
+  $term_visibility = $values['term_visibility'];
+  $term_visibility_exceptions = $values['term_visibility_exceptions'];
+
+  if ($term_visibility && !empty($term_visibility_exceptions)) {
+    // If term_visibility enabled and exceptions not empty split the lines into
+    // an array.
+    $term_visibility_exceptions = preg_split("/\r\n|\n|\r/", $term_visibility_exceptions);
+  }
+  else {
+    // Otherwise set as a blank array.
+    config_clear('tac_lite.settings', 'config_scheme_' . $scheme_id . '.term_visibility_exceptions');
+    $term_visibility_exceptions = array();
+  }
+
+  // Overwrite the form_state value.
+  $form_state['values']['config_scheme_' . $scheme_id]['term_visibility_exceptions'] = $term_visibility_exceptions;
 }
 
 /**
@@ -341,6 +388,17 @@ function tac_lite_admin_scheme_form_submit($form, &$form_state) {
  */
 function tac_lite_form_alter(&$form, &$form_state, $form_id){
   $config = config('tac_lite.settings');
+
+  // Handle any term visibility exceptions.
+  // The hook_query_TAG_alter() implementation:
+  // (tac_lite_query_term_access_alter()) will handle this; we just need that
+  // function to know the form that called it by storing the form_id in the
+  // session.
+  if (session_status() !== PHP_SESSION_ACTIVE) {
+    session_start();
+  }
+  $_SESSION['tac_lite_term_visibility_exceptions_form_id'] = $form_id;
+
   // Catch for the tac_lite category on the user edit form.
   if ($form_id == 'user_profile_form' && user_access('administer users')) {
     $all_vocabularies = taxonomy_get_vocabularies();
@@ -686,12 +744,18 @@ function tac_lite_query_term_access_alter(QueryAlterableInterface $query) {
     return;
   }
 
+  // Get the form_id to check schemes for any form exceptions where term
+  // visibility in forms should be allowed.
+  if (session_status() !== PHP_SESSION_ACTIVE) session_start();
+  $term_visibility_exceptions_form_id = $_SESSION['tac_lite_term_visibility_exceptions_form_id'] ?? NULL;
+
   // The terms this user is allowed to see.
   $term_visibility = FALSE;
   $tids = array();
   for ($i = 1; $i <= $schemes; $i++) {
     $scheme_info = _tac_lite_scheme_info($i);
-    if ($scheme_info['term_visibility']) {
+    $term_visibility_override = in_array($term_visibility_exceptions_form_id, $scheme_info['term_visibility_exceptions']);
+    if ($scheme_info['term_visibility'] && !$term_visibility_override) {
       $tids = array_merge($tids, _tac_lite_user_tids($user, $i));
       $term_visibility = TRUE;
     }
