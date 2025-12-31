@@ -192,6 +192,8 @@ function _tac_lite_scheme_info($scheme) {
   $scheme_info += array(
     'term_visibility' => (isset($scheme_info['perms']['grant_view']) && $scheme_info['perms']['grant_view']),
     'unpublished' => FALSE,
+    'term_parents' => FALSE,
+    'term_children' => FALSE,
   );
 
   // For backward compatability, use naming convention for scheme 1.
@@ -260,6 +262,18 @@ function tac_lite_admin_scheme_form($form, $form_state, $i) {
       '#markup' => t('To grant to an individual user, visit the <em>access by taxonomy</em> tab on the account edit page.'),
       '#prefix' => '<p>',
       '#suffix' => '</p>',
+    );
+    $form['config_scheme_' . $i]['term_parents'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Grant access to parent terms'),
+      '#description' => t('If checked, then nodes with parent terms of selected terms will be accessible and parent terms will also be visible in select fields.'),
+      '#default_value' => $scheme_info['term_parents'],
+    );
+    $form['config_scheme_' . $i]['term_children'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Grant access to child terms'),
+      '#description' => t('If checked, then nodes with child terms of selected terms will be accessible and child terms will also be visible in select fields.'),
+      '#default_value' => $scheme_info['term_children'],
     );
 
     $form['config_scheme_' . $i]['user_terms'] = array(
@@ -698,6 +712,35 @@ function _tac_lite_user_tids($account, $scheme) {
   // to ''. Here we make sure not to return that.
   unset($grants['']);
 
+  // Remove any duplicates.
+  $grants = array_unique($grants);
+
+  // Check if term parents should be included.
+  $get_parents = $scheme_info['term_parents'];
+
+  // Check if term children should be included.
+  $get_children = $scheme_info['term_children'];
+
+  // If parents and/or children are selected, loop through each grant and get
+  // the applicable terms.
+  if ($get_parents || $get_children) {
+    // Create a blank array to merge any term children into.
+    $children = array();
+    // Create a blank array to merge any term parents into.
+    $parents = array();
+    foreach ($grants as $tid) {
+      if ($tid > 0) {
+        if ($get_parents) {
+          $parents = array_merge($parents, tac_lite_get_taxonomy_term_parents($tid));
+        }
+        if ($get_children) {
+          $children = array_merge($children, tac_lite_get_taxonomy_term_children($tid));
+        }
+      }
+    }
+    // Merge the parents and children, removing any duplicates.
+    $grants = array_unique(array_merge($grants, $parents, $children));
+  }
   return $grants;
 }
 
@@ -774,4 +817,57 @@ function tac_lite_query_term_access_alter(QueryAlterableInterface $query) {
     $or->condition('tac_td.vocabulary', $selected_vocabularies, 'NOT IN');
     $query->condition($or);
   }
+}
+
+/**
+ * A version of `taxonomy_term_load_children` that avoids causing an infinite
+ * loop and just returns the `tids` rather than full term objects.
+ *
+ * @param int $tid
+ *   A taxonomy term ID.
+ * @param string $vocabulary_name
+ *   An optional vocabulary name to restrict the child search.
+ *
+ * @return array
+ *   An array of term $tids, or an empty array when no children exist.
+ */
+function tac_lite_get_taxonomy_term_children($tid, $vocabulary_name = NULL) {
+  if ($tid) {
+    $query = db_select('taxonomy_term_data', 't');
+    $query->join('taxonomy_term_hierarchy', 'h', 'h.tid = t.tid');
+    $query->addField('t', 'tid');
+    $query->condition('h.parent', $tid);
+    if ($vocabulary_name) {
+      $query->condition('t.vocabulary', $vocabulary_name);
+    }
+    $query->orderBy('t.weight');
+    $query->orderBy('t.name');
+    $tids = $query->execute()->fetchCol();
+  }
+  return isset($tids) ? $tids : array();
+}
+
+/**
+ * A version of `taxonomy_term_load_parents` that avoids causing an infinite
+ * loop and just returns the `tids` rather than full term objects.
+ *
+ * @param int $tid
+ *   A taxonomy term ID.
+ *
+ * @return array
+ *   An array of term $tids, or an empty array when no parents are found.
+ */
+function tac_lite_get_taxonomy_term_parents($tid) {
+
+  if ($tid) {
+    $query = db_select('taxonomy_term_data', 't');
+    $query->join('taxonomy_term_hierarchy', 'h', 'h.parent = t.tid');
+    $query->addField('t', 'tid');
+    $query->condition('h.tid', $tid);
+    $query->orderBy('t.weight');
+    $query->orderBy('t.name');
+    $tids = $query->execute()->fetchCol();
+  }
+
+  return isset($tids) ? $tids : array();
 }

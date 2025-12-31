@@ -84,6 +84,19 @@ function tac_lite_update_1001() {
 }
 
 /**
+ * Set defaults for term_parents and term_children settings.
+ */
+function tac_lite_update_1002() {
+  $config = config('tac_lite.settings');
+  $schemes = $config->get('schemes');
+  for ($i = 1; $i <= $schemes; $i++) {
+    $config->set('config_scheme_' . $i . '.term_parents', 0);
+    $config->set('config_scheme_' . $i . '.term_children', 0);
+  }
+  $config->save();
+}
+
+/**
  * Implements hook_update_last_removed().
  */
 function tac_lite_update_last_removed() {
