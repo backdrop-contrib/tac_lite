@@ -34,6 +34,9 @@ Here are some key features of `tac_lite`:
 * Grant permissions based on a term reference field on the user profile. (If
   the user has the same term as a node, access is granted.)
 
+* Apply term visibility to form fields so nodes can only be created with
+  allowed terms.
+
 * Supports view, update and delete permissions.
 
 ### Example Use Case: Website to track and share work projects
