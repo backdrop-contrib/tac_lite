@@ -195,6 +195,8 @@ function _tac_lite_scheme_info($scheme) {
     'unpublished' => FALSE,
     'term_parents' => FALSE,
     'term_children' => FALSE,
+    'user_terms' => FALSE,
+    'user_terms_field' => NULL,
   );
 
   // For backward compatability, use naming convention for scheme 1.
@@ -277,12 +279,6 @@ function tac_lite_admin_scheme_form($form, $form_state, $i) {
       ),
     );
 
-    $form['helptext'] = array(
-      '#type' => 'markup',
-      '#markup' => t('To grant to an individual user, visit the <em>access by taxonomy</em> tab on the account edit page.'),
-      '#prefix' => '<p>',
-      '#suffix' => '</p>',
-    );
     $form['config_scheme_' . $i]['term_parents'] = array(
       '#type' => 'checkbox',
       '#title' => t('Grant access to parent terms'),
@@ -299,7 +295,7 @@ function tac_lite_admin_scheme_form($form, $form_state, $i) {
     $form['config_scheme_' . $i]['user_terms'] = array(
       '#type' => 'checkbox',
       '#title' => t("Use account term reference for grants."),
-      '#default_value' => $scheme_info['user_terms'] ?? FALSE,
+      '#default_value' => $scheme_info['user_terms'],
       '#prefix' => '<p>',
       '#suffix' => '</p>',
     );
@@ -307,7 +303,7 @@ function tac_lite_admin_scheme_form($form, $form_state, $i) {
       '#type' => 'select',
       '#title' => t("Term reference field"),
       '#options' => tac_lite_get_fields_for_type('user', 'user', 'taxonomy_term_reference'),
-      '#default_value' => $scheme_info['user_terms_field'] ?? NULL,
+      '#default_value' => $scheme_info['user_terms_field'],
       '#states' => array(
         'visible' => array(
           ':input[name="config_scheme_' . $i . '[user_terms]"]' => array('checked' => TRUE),
@@ -316,6 +312,14 @@ function tac_lite_admin_scheme_form($form, $form_state, $i) {
       '#prefix' => '<p>',
       '#suffix' => '</p>',
     );
+
+    $form['helptext'] = array(
+      '#type' => 'markup',
+      '#markup' => t('To grant to an individual user, visit the <em>access by taxonomy</em> tab on the account edit page.'),
+      '#prefix' => '<p>',
+      '#suffix' => '</p>',
+    );
+
     $form['helptext2'] = array(
       '#type' => 'markup',
       '#markup' => t('To grant by role, select the terms below.'),
@@ -448,15 +452,19 @@ function tac_lite_get_fields_for_type($entity_type, $bundle, $field_type) {
 function tac_lite_form_alter(&$form, &$form_state, $form_id){
   $config = config('tac_lite.settings');
 
-  // Handle any term visibility exceptions.
+  // Handle any term visibility form exceptions.
   // The hook_query_TAG_alter() implementation:
   // (tac_lite_query_term_access_alter()) will handle this; we just need that
   // function to know the form that called it by storing the form_id in the
-  // session.
+  // session. We also send the REQUEST_TIME so we can clear the session variable
+  // when the user leaves the form.
   if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
   }
-  $_SESSION['tac_lite_term_visibility_exceptions_form_id'] = $form_id;
+  $_SESSION['tac_lite_term_visibility_exceptions'] = array(
+    'form_id' => $form_id,
+    'request_time' => REQUEST_TIME,
+  );
 
   // Catch for the tac_lite category on the user edit form.
   if ($form_id == 'user_profile_form' && user_access('administer users')) {
@@ -849,15 +857,31 @@ function tac_lite_query_term_access_alter(QueryAlterableInterface $query) {
 
   // Get the form_id to check schemes for any form exceptions where term
   // visibility in forms should be allowed.
+  // Check for the session variable.
   if (session_status() !== PHP_SESSION_ACTIVE) session_start();
-  $term_visibility_exceptions_form_id = $_SESSION['tac_lite_term_visibility_exceptions_form_id'] ?? NULL;
+  $term_visibility_exceptions = $_SESSION['tac_lite_term_visibility_exceptions'] ?? array(
+    'form_id' => NULL,
+    'request_time' => NULL,
+  );
+  // Check if this query is called as part of the same request as the form
+  // generated.
+  if ($term_visibility_exceptions['request_time'] !== REQUEST_TIME) {
+    // If not, check to see if this is an AJAX request as that indicates a field
+    // on the form and therefore form_id is still valid.
+    $ajax_request = ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? NULL) === 'XMLHttpRequest';
+    if (!$ajax_request) {
+      // If it is not an AJAX request then this indicates navigation to a
+      // different page so we should clear the session variable.
+      unset($_SESSION['tac_lite_term_visibility_exceptions']);
+    }
+  }
 
   // The terms this user is allowed to see.
   $term_visibility = FALSE;
   $tids = array();
   for ($i = 1; $i <= $schemes; $i++) {
     $scheme_info = _tac_lite_scheme_info($i);
-    $term_visibility_override = in_array($term_visibility_exceptions_form_id, $scheme_info['term_visibility_exceptions']);
+    $term_visibility_override = in_array($term_visibility_exceptions['form_id'], $scheme_info['term_visibility_exceptions']);
     if ($scheme_info['term_visibility'] && !$term_visibility_override) {
       $tids = array_merge($tids, _tac_lite_user_tids($user, $i));
       $term_visibility = TRUE;
