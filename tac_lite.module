@@ -871,8 +871,13 @@ function tac_lite_query_term_access_alter(QueryAlterableInterface $query) {
     $ajax_request = ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? NULL) === 'XMLHttpRequest';
     if (!$ajax_request) {
       // If it is not an AJAX request then this indicates navigation to a
-      // different page so we should clear the session variable.
+      // different page so we should clear the session variable and the values
+      // we derived from it.
       unset($_SESSION['tac_lite_term_visibility_exceptions']);
+      $term_visibility_exceptions = array(
+        'form_id' => NULL,
+        'request_time' => NULL,
+      );
     }
   }
 
