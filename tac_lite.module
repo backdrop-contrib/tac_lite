@@ -461,7 +461,7 @@ function tac_lite_form_alter(&$form, &$form_state, $form_id){
   if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
   }
-  if (!is_null($_SESSION['tac_lite_term_visibility_exceptions']['request_time'])) {
+  if (isset($_SESSION['tac_lite_term_visibility_exceptions']['request_time'])) {
     $_SESSION['tac_lite_term_visibility_exceptions']['form_ids'][] = $form_id;
   }
   else {
