@@ -398,10 +398,15 @@ function tac_lite_form_alter(&$form, &$form_state, $form_id){
   if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
   }
-  $_SESSION['tac_lite_term_visibility_exceptions'] = array(
-    'form_id' => $form_id,
-    'request_time' => REQUEST_TIME,
-  );
+  if (!is_null($_SESSION['tac_lite_term_visibility_exceptions']['request_time'])) {
+    $_SESSION['tac_lite_term_visibility_exceptions']['form_ids'][] = $form_id;
+  }
+  else {
+    $_SESSION['tac_lite_term_visibility_exceptions'] = array(
+      'request_time' => REQUEST_TIME,
+      'form_ids' => array($form_id),
+    );
+  }
 
   // Catch for the tac_lite category on the user edit form.
   if ($form_id == 'user_profile_form' && user_access('administer users')) {
@@ -753,7 +758,7 @@ function tac_lite_query_term_access_alter(QueryAlterableInterface $query) {
   // Check for the session variable.
   if (session_status() !== PHP_SESSION_ACTIVE) session_start();
   $term_visibility_exceptions = $_SESSION['tac_lite_term_visibility_exceptions'] ?? array(
-    'form_id' => NULL,
+    'form_ids' => NULL,
     'request_time' => NULL,
   );
   // Check if this query is called as part of the same request as the form
@@ -768,7 +773,7 @@ function tac_lite_query_term_access_alter(QueryAlterableInterface $query) {
       // we derived from it.
       unset($_SESSION['tac_lite_term_visibility_exceptions']);
       $term_visibility_exceptions = array(
-        'form_id' => NULL,
+        'form_ids' => NULL,
         'request_time' => NULL,
       );
     }
@@ -779,7 +784,15 @@ function tac_lite_query_term_access_alter(QueryAlterableInterface $query) {
   $tids = array();
   for ($i = 1; $i <= $schemes; $i++) {
     $scheme_info = _tac_lite_scheme_info($i);
-    $term_visibility_override = in_array($term_visibility_exceptions['form_id'], $scheme_info['term_visibility_exceptions']);
+    $term_visibility_override = FALSE;
+    if (is_array($term_visibility_exceptions['form_ids'])) {
+      foreach ($term_visibility_exceptions['form_ids'] as $form_id) {
+        $term_visibility_override = in_array($form_id, $scheme_info['term_visibility_exceptions']);
+        if ($term_visibility_override) {
+          break;
+        }
+      }
+    }
     if ($scheme_info['term_visibility'] && !$term_visibility_override) {
       $tids = array_merge($tids, _tac_lite_user_tids($user, $i));
       $term_visibility = TRUE;
