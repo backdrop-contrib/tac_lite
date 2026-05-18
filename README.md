@@ -84,6 +84,11 @@ see.
 - Now the user can also access the node you created.
 
 ### Notes
+If you are using the Visibility option to limit term visibility in forms and you
+also set 'Term visibility form exceptions' then the terms will be visible if
+that form appears on the page. Therefore, if you have one form you wish to
+restrict terms on and another that you do not wish to restrict terms on you will
+need to display them in separate page requests.
 
 If behavior of this or any other access control module seems to be
 incorrect, try rebuilding the node access table. This may be done
