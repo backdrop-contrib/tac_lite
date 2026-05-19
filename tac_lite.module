@@ -453,15 +453,15 @@ function tac_lite_form_alter(&$form, &$form_state, $form_id){
   $config = config('tac_lite.settings');
 
   // Handle any term visibility form exceptions.
-  // The hook_query_TAG_alter() implementation:
-  // (tac_lite_query_term_access_alter()) will handle this; we just need that
-  // function to know the form that called it by storing the form_id in the
-  // session. We also send the REQUEST_TIME so we can clear the session variable
-  // when the user leaves the form.
+  // The hook_query_alter() implementation:
+  // (tac_lite_query_alter()) will handle this; we just need that function to
+  // know the form that called it by storing the form_id(s) in the session. We
+  // also send the REQUEST_TIME so we can clear the session variable when the
+  // user leaves the form.
   if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
   }
-  if (isset($_SESSION['tac_lite_term_visibility_exceptions']['request_time'])) {
+  if (isset($_SESSION['tac_lite_term_visibility_exceptions']['request_time']) && $_SESSION['tac_lite_term_visibility_exceptions']['request_time'] == REQUEST_TIME) {
     $_SESSION['tac_lite_term_visibility_exceptions']['form_ids'][] = $form_id;
   }
   else {
@@ -469,6 +469,55 @@ function tac_lite_form_alter(&$form, &$form_state, $form_id){
       'request_time' => REQUEST_TIME,
       'form_ids' => array($form_id),
     );
+  }
+
+  // Taxonomy reference fields that do not use AJAX are populated with options
+  // before this function is called so we need to repopulate taking into account
+  // any forms with term visibility exceptions.
+  //
+  // First get all the forms that are listed as term visibility exceptions in
+  // all schemes.
+  $scheme_term_visibility_exceptions = array();
+  for ($i = 1; $i <= $config->get('schemes'); $i++) {
+    $scheme_info = _tac_lite_scheme_info($i);
+    $scheme_term_visibility_exceptions = array_merge($scheme_term_visibility_exceptions, $scheme_info['term_visibility_exceptions']);
+  }
+  $scheme_term_visibility_exceptions = array_unique($scheme_term_visibility_exceptions);
+
+  // If this form is in the list then proceed.
+  if (in_array($form_id, $scheme_term_visibility_exceptions)) {
+    // Get all taxonomy fields with a widget that does not use AJAX from the
+    // form.
+    if (isset($form_state['field'])) {
+      $fields = array();
+      // List by modules. Including core module available to use for term
+      // reference fields. Only aware of multiselect in the contrib modules
+      // available that don't use AJAX to populate.
+      $widget_modules_to_handle = array('options', 'multiselect');
+      foreach ($form_state['field'] as $field_name => $field_settings) {
+        if ($field_settings['und']['field']['type'] == 'taxonomy_term_reference' && in_array($field_settings['und']['instance']['widget']['module'], $widget_modules_to_handle)) {
+          $fields[$field_name] = array(
+            'vocabularies' => $field_settings['und']['field']['settings']['allowed_values'],
+          );
+        }
+      }
+      if (!empty($fields)) {
+        // Get the vocabulary for each field and add it to the options.
+        $options = array();
+        foreach ($fields as $field_name => $field_settings) {
+          $existing_options = $form[$field_name]['und']['#options'];
+          foreach ($field_settings['vocabularies'] as $key => $vocab_setting) {
+            $terms = taxonomy_get_tree($vocab_setting['vocabulary'], $vocab_setting['parent']);
+            foreach ($terms as $term) {
+              $options[$term->tid] = $term->name;
+            }
+          }
+          // Merge any additional options with the existing options while
+          // preserving the term ids as keys.
+          $form[$field_name]['und']['#options'] = $existing_options + $options;
+        }
+      }
+    }
   }
 
   // Catch for the tac_lite category on the user edit form.
@@ -839,12 +888,17 @@ function tac_lite_node_grants($account, $op) {
 }
 
 /**
- * Implements hook_query_TAG_alter().
+ * Implements hook_query_alter().
  *
- * Acts on queries that list terms (generally these should be tagged with 'term_access')
- * to remove any terms that this user should not be able to see.
+ * Acts on queries that list terms (generally these should be tagged with either
+ * 'term_access' or 'taxonomy_term_access') to remove any terms that this user
+ * should not be able to see.
  */
-function tac_lite_query_term_access_alter(QueryAlterableInterface $query) {
+function tac_lite_query_alter(QueryAlterableInterface $query) {
+  // Check the query tag and if not applicable, then exit.
+  if (!$query->hasAnyTag('term_access', 'taxonomy_term_access')) {
+    return;
+  }
   global $user;
   $config = config('tac_lite.settings');
 
@@ -889,9 +943,13 @@ function tac_lite_query_term_access_alter(QueryAlterableInterface $query) {
   // The terms this user is allowed to see.
   $term_visibility = FALSE;
   $tids = array();
+
+  // Get each TAC Lite scheme.
   for ($i = 1; $i <= $schemes; $i++) {
     $scheme_info = _tac_lite_scheme_info($i);
     $term_visibility_override = FALSE;
+    // Check if the form_ids in the request (or subsequent AJAX request) are
+    // listed in a scheme as being an exception to the Visibility rule.
     if (is_array($term_visibility_exceptions['form_ids'])) {
       foreach ($term_visibility_exceptions['form_ids'] as $form_id) {
         $term_visibility_override = in_array($form_id, $scheme_info['term_visibility_exceptions']);
@@ -901,6 +959,8 @@ function tac_lite_query_term_access_alter(QueryAlterableInterface $query) {
       }
     }
 
+    // If term_visibility setting is on and is not overridden, then get the list
+    // of term ids that the user can access.
     if ($scheme_info['term_visibility'] && !$term_visibility_override) {
       $tids = array_merge($tids, _tac_lite_user_tids($user, $i));
       $term_visibility = TRUE;
@@ -917,7 +977,8 @@ function tac_lite_query_term_access_alter(QueryAlterableInterface $query) {
       }
     }
 
-    // Prevent query from finding terms the current user does not have permission to see.
+    // Prevent query from finding terms the current user does not have
+    // permission to see.
     $query->leftJoin('taxonomy_term_data', 'tac_td', $primary_table . '.tid = tac_td.tid');
     $or = db_or();
     $or->condition($primary_table . '.tid', $tids, 'IN');
