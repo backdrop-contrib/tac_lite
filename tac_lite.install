@@ -29,7 +29,7 @@ function tac_lite_update_1000() {
   $schemes = update_variable_get('tac_lite_schemes', 1);
   // Convert variables to config.
   $config = config('tac_lite.settings');
-  $config->setStatic();
+  $config->set('_config_static', TRUE);
   $config->set('categories', update_variable_get('tac_lite_categories', [0]));
   $config->set('schemes', $schemes);
   for ($i = 1; $i <= $schemes; $i++) {
@@ -88,7 +88,7 @@ function tac_lite_update_1001() {
  */
 function tac_lite_update_1002() {
   $config = config('tac_lite.settings');
-  $config->setStatic();
+  $config->set('_config_static', TRUE);
   $config->save();
 }
 
