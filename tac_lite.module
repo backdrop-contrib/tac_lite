@@ -191,7 +191,12 @@ function _tac_lite_scheme_info($scheme) {
   // Merge defaults, for backward compatibility.
   $scheme_info += array(
     'term_visibility' => (isset($scheme_info['perms']['grant_view']) && $scheme_info['perms']['grant_view']),
+    'term_visibility_exceptions' => array(),
     'unpublished' => FALSE,
+    'term_parents' => FALSE,
+    'term_children' => FALSE,
+    'user_terms' => FALSE,
+    'user_terms_field' => NULL,
   );
 
   // For backward compatability, use naming convention for scheme 1.
@@ -215,6 +220,7 @@ function tac_lite_admin_scheme_form($form, $form_state, $i) {
 
   $scheme_info = _tac_lite_scheme_info($i);
   $form['#tac_lite_scheme_info'] = $scheme_info;
+  $form['#tac_lite_scheme_id'] = $i;
   $form['#config'] = 'tac_lite.settings';
   if (count($selected_vocabularies)) {
     $form['config_scheme_' . $i] = array('#tree' => TRUE);
@@ -255,12 +261,65 @@ function tac_lite_admin_scheme_form($form, $form_state, $i) {
       '#default_value' => $scheme_info['term_visibility'],
     );
 
+    $term_visibility_exceptions = $scheme_info['term_visibility'] ? implode(PHP_EOL, $scheme_info['term_visibility_exceptions']) : '';
+    $form['config_scheme_' . $i]['term_visibility_exceptions'] = array(
+      '#type' => 'textarea',
+      '#title' => t('Term visibility form exceptions'),
+      '#default_value' => $term_visibility_exceptions,
+      '#description' => t("By entering Form IDs into this box, these forms will be excluded from the restrictions. Enter one Form ID per line. If you are not sure how to find the Form ID you can use the <a href='@devel-form-debug-module'>Devel Form Debug module</a>. If you have more that one Scheme where 'Visibility' is enabled, you may see unexpected results unless you add the form exceptions into each Scheme.", array(
+        '@devel-form-debug-module' => 'https://backdropcms.org/project/devel_form_debug',
+      )),
+      '#states' => array(
+        'visible' => array(
+          ':input[name="config_scheme_' . $i . '[term_visibility]"]' => array('checked' => TRUE),
+        ),
+        'enabled' => array(
+          ':input[name="config_scheme_' . $i . '[term_visibility]"]' => array('checked' => TRUE),
+        ),
+      ),
+    );
+
+    $form['config_scheme_' . $i]['term_parents'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Grant access to parent terms'),
+      '#description' => t('If checked, then nodes with parent terms of selected terms will be accessible and parent terms will also be visible in select fields.'),
+      '#default_value' => $scheme_info['term_parents'],
+    );
+    $form['config_scheme_' . $i]['term_children'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Grant access to child terms'),
+      '#description' => t('If checked, then nodes with child terms of selected terms will be accessible and child terms will also be visible in select fields.'),
+      '#default_value' => $scheme_info['term_children'],
+    );
+
+    $form['config_scheme_' . $i]['user_terms'] = array(
+      '#type' => 'checkbox',
+      '#title' => t("Use account term reference for grants."),
+      '#default_value' => $scheme_info['user_terms'],
+      '#prefix' => '<p>',
+      '#suffix' => '</p>',
+    );
+    $form['config_scheme_' . $i]['user_terms_field'] = array(
+      '#type' => 'select',
+      '#title' => t("Term reference field"),
+      '#options' => tac_lite_get_fields_for_type('user', 'user', 'taxonomy_term_reference'),
+      '#default_value' => $scheme_info['user_terms_field'],
+      '#states' => array(
+        'visible' => array(
+          ':input[name="config_scheme_' . $i . '[user_terms]"]' => array('checked' => TRUE),
+        ),
+      ),
+      '#prefix' => '<p>',
+      '#suffix' => '</p>',
+    );
+
     $form['helptext'] = array(
       '#type' => 'markup',
       '#markup' => t('To grant to an individual user, visit the <em>access by taxonomy</em> tab on the account edit page.'),
       '#prefix' => '<p>',
       '#suffix' => '</p>',
     );
+
     $form['helptext2'] = array(
       '#type' => 'markup',
       '#markup' => t('To grant by role, select the terms below.'),
@@ -298,6 +357,7 @@ function tac_lite_admin_scheme_form($form, $form_state, $i) {
       '#weight' => 9,
     );
 
+    $form['#submit'][] = 'tac_lite_term_visibility_exceptions_array';
     $form['#submit'][] = 'tac_lite_admin_scheme_form_submit';
     return system_settings_form($form);
   }
@@ -308,6 +368,32 @@ function tac_lite_admin_scheme_form($form, $form_state, $i) {
       '#markup' => t('First, select one or more vocabularies on the <a href=!url>settings tab</a>. Then, return to this page to complete configuration.', array('!url' => url('admin/config/people/tac_lite/settings'))));
     return $form;
   }
+}
+
+/**
+ * Convert the text box contents of term_visibility_exceptions to an array.
+ */
+function tac_lite_term_visibility_exceptions_array($form, &$form_state) {
+  // Get the Scheme ID from the form.
+  $scheme_id = $form['#tac_lite_scheme_id'];
+  // Get the relevant values submitted in the form.
+  $values = $form_state['values']['config_scheme_' . $scheme_id];
+  $term_visibility = $values['term_visibility'];
+  $term_visibility_exceptions = $values['term_visibility_exceptions'];
+
+  if ($term_visibility && !empty($term_visibility_exceptions)) {
+    // If term_visibility enabled and exceptions not empty split the lines into
+    // an array.
+    $term_visibility_exceptions = preg_split("/\r\n|\n|\r/", $term_visibility_exceptions);
+  }
+  else {
+    // Otherwise set as a blank array.
+    config_clear('tac_lite.settings', 'config_scheme_' . $scheme_id . '.term_visibility_exceptions');
+    $term_visibility_exceptions = array();
+  }
+
+  // Overwrite the form_state value.
+  $form_state['values']['config_scheme_' . $scheme_id]['term_visibility_exceptions'] = $term_visibility_exceptions;
 }
 
 /**
@@ -329,6 +415,30 @@ function tac_lite_admin_scheme_form_submit($form, &$form_state) {
 }
 
 /**
+ * Helper function to return all term reference fields for a bundle.
+ *
+ * @param string $entity_type
+ *   The entity type.
+ * @param string $bundle
+ *   The bundle name.
+ * @param string $field_type
+ *   The field type.
+ *
+ * @return array
+ *   An array of all fields of the selected type.
+ */
+function tac_lite_get_fields_for_type($entity_type, $bundle, $field_type) {
+  $instances = field_info_instances($entity_type, $bundle);
+  foreach ($instances as $instance) {
+    $field_info = field_info_field($instance['field_name']);
+    if ($field_info['type'] == $field_type) {
+      $fields[$instance['field_name']] = $instance['label'];
+    }
+  }
+  return $fields;
+}
+
+/**
  * Implements hook_form_alter().
  *
  * @param $form
@@ -341,6 +451,75 @@ function tac_lite_admin_scheme_form_submit($form, &$form_state) {
  */
 function tac_lite_form_alter(&$form, &$form_state, $form_id){
   $config = config('tac_lite.settings');
+
+  // Handle any term visibility form exceptions.
+  // The hook_query_alter() implementation:
+  // (tac_lite_query_alter()) will handle this; we just need that function to
+  // know the form that called it by storing the form_id(s) in the session. We
+  // also send the REQUEST_TIME so we can clear the session variable when the
+  // user leaves the form.
+  if (session_status() !== PHP_SESSION_ACTIVE) {
+    session_start();
+  }
+  if (isset($_SESSION['tac_lite_term_visibility_exceptions']['request_time']) && $_SESSION['tac_lite_term_visibility_exceptions']['request_time'] == REQUEST_TIME) {
+    $_SESSION['tac_lite_term_visibility_exceptions']['form_ids'][] = $form_id;
+  }
+  else {
+    $_SESSION['tac_lite_term_visibility_exceptions'] = array(
+      'request_time' => REQUEST_TIME,
+      'form_ids' => array($form_id),
+    );
+  }
+
+  // Taxonomy reference fields that do not use AJAX are populated with options
+  // before this function is called so we need to repopulate taking into account
+  // any forms with term visibility exceptions.
+  //
+  // First get all the forms that are listed as term visibility exceptions in
+  // all schemes.
+  $scheme_term_visibility_exceptions = array();
+  for ($i = 1; $i <= $config->get('schemes'); $i++) {
+    $scheme_info = _tac_lite_scheme_info($i);
+    $scheme_term_visibility_exceptions = array_merge($scheme_term_visibility_exceptions, $scheme_info['term_visibility_exceptions']);
+  }
+  $scheme_term_visibility_exceptions = array_unique($scheme_term_visibility_exceptions);
+
+  // If this form is in the list then proceed.
+  if (in_array($form_id, $scheme_term_visibility_exceptions)) {
+    // Get all taxonomy fields with a widget that does not use AJAX from the
+    // form.
+    if (isset($form_state['field'])) {
+      $fields = array();
+      // List by modules. Including core module available to use for term
+      // reference fields. Only aware of multiselect in the contrib modules
+      // available that don't use AJAX to populate.
+      $widget_modules_to_handle = array('options', 'multiselect');
+      foreach ($form_state['field'] as $field_name => $field_settings) {
+        if ($field_settings['und']['field']['type'] == 'taxonomy_term_reference' && in_array($field_settings['und']['instance']['widget']['module'], $widget_modules_to_handle)) {
+          $fields[$field_name] = array(
+            'vocabularies' => $field_settings['und']['field']['settings']['allowed_values'],
+          );
+        }
+      }
+      if (!empty($fields)) {
+        // Get the vocabulary for each field and add it to the options.
+        $options = array();
+        foreach ($fields as $field_name => $field_settings) {
+          $existing_options = $form[$field_name]['und']['#options'];
+          foreach ($field_settings['vocabularies'] as $key => $vocab_setting) {
+            $terms = taxonomy_get_tree($vocab_setting['vocabulary'], $vocab_setting['parent']);
+            foreach ($terms as $term) {
+              $options[$term->tid] = $term->name;
+            }
+          }
+          // Merge any additional options with the existing options while
+          // preserving the term ids as keys.
+          $form[$field_name]['und']['#options'] = $existing_options + $options;
+        }
+      }
+    }
+  }
+
   // Catch for the tac_lite category on the user edit form.
   if ($form_id == 'user_profile_form' && user_access('administer users')) {
     $all_vocabularies = taxonomy_get_vocabularies();
@@ -633,11 +812,55 @@ function _tac_lite_user_tids($account, $scheme) {
     }
   }
 
+  // Use the user term field for grants.
+  if ($scheme_info['user_terms']) {
+    $field_name = $scheme_info['user_terms_field'];
+    $account = user_load($account->uid);
+    $items = field_get_items('user', $account, $field_name);
+    if (is_array($items)) {
+      foreach ($items as $tids) {
+        if (count($tids)) {
+          $ctids[] = $tids['tid'];
+        }
+      }
+      $grants = array_merge($grants, $ctids);
+    }
+  }
+
   // Because of some flakyness in the form API and the form we insert under
   // user settings, we may have a bogus entry with vocabulary set
   // to ''. Here we make sure not to return that.
   unset($grants['']);
 
+  // Remove any duplicates.
+  $grants = array_unique($grants);
+
+  // Check if term parents should be included.
+  $get_parents = $scheme_info['term_parents'];
+
+  // Check if term children should be included.
+  $get_children = $scheme_info['term_children'];
+
+  // If parents and/or children are selected, loop through each grant and get
+  // the applicable terms.
+  if ($get_parents || $get_children) {
+    // Create a blank array to merge any term children into.
+    $children = array();
+    // Create a blank array to merge any term parents into.
+    $parents = array();
+    foreach ($grants as $tid) {
+      if ($tid > 0) {
+        if ($get_parents) {
+          $parents = array_merge($parents, tac_lite_get_taxonomy_term_parents($tid));
+        }
+        if ($get_children) {
+          $children = array_merge($children, tac_lite_get_taxonomy_term_children($tid));
+        }
+      }
+    }
+    // Merge the parents and children, removing any duplicates.
+    $grants = array_unique(array_merge($grants, $parents, $children));
+  }
   return $grants;
 }
 
@@ -665,12 +888,17 @@ function tac_lite_node_grants($account, $op) {
 }
 
 /**
- * Implements hook_query_TAG_alter().
+ * Implements hook_query_alter().
  *
- * Acts on queries that list terms (generally these should be tagged with 'term_access')
- * to remove any terms that this user should not be able to see.
+ * Acts on queries that list terms (generally these should be tagged with either
+ * 'term_access' or 'taxonomy_term_access') to remove any terms that this user
+ * should not be able to see.
  */
-function tac_lite_query_term_access_alter(QueryAlterableInterface $query) {
+function tac_lite_query_alter(QueryAlterableInterface $query) {
+  // Check the query tag and if not applicable, then exit.
+  if (!$query->hasAnyTag('term_access', 'taxonomy_term_access')) {
+    return;
+  }
   global $user;
   $config = config('tac_lite.settings');
 
@@ -686,12 +914,54 @@ function tac_lite_query_term_access_alter(QueryAlterableInterface $query) {
     return;
   }
 
+  // Get the form_id to check schemes for any form exceptions where term
+  // visibility in forms should be allowed.
+  // Check for the session variable.
+  if (session_status() !== PHP_SESSION_ACTIVE) session_start();
+  $term_visibility_exceptions = $_SESSION['tac_lite_term_visibility_exceptions'] ?? array(
+    'form_ids' => NULL,
+    'request_time' => NULL,
+  );
+  // Check if this query is called as part of the same request as the form
+  // generated.
+  if ($term_visibility_exceptions['request_time'] !== REQUEST_TIME) {
+    // If not, check to see if this is an AJAX request as that indicates a field
+    // on the form and therefore form_id is still valid.
+    $ajax_request = ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? NULL) === 'XMLHttpRequest';
+    if (!$ajax_request) {
+      // If it is not an AJAX request then this indicates navigation to a
+      // different page so we should clear the session variable and the values
+      // we derived from it.
+      unset($_SESSION['tac_lite_term_visibility_exceptions']);
+      $term_visibility_exceptions = array(
+        'form_ids' => NULL,
+        'request_time' => NULL,
+      );
+    }
+  }
+
   // The terms this user is allowed to see.
   $term_visibility = FALSE;
   $tids = array();
+
+  // Get each TAC Lite scheme.
   for ($i = 1; $i <= $schemes; $i++) {
     $scheme_info = _tac_lite_scheme_info($i);
-    if ($scheme_info['term_visibility']) {
+    $term_visibility_override = FALSE;
+    // Check if the form_ids in the request (or subsequent AJAX request) are
+    // listed in a scheme as being an exception to the Visibility rule.
+    if (is_array($term_visibility_exceptions['form_ids'])) {
+      foreach ($term_visibility_exceptions['form_ids'] as $form_id) {
+        $term_visibility_override = in_array($form_id, $scheme_info['term_visibility_exceptions']);
+        if ($term_visibility_override) {
+          break;
+        }
+      }
+    }
+
+    // If term_visibility setting is on and is not overridden, then get the list
+    // of term ids that the user can access.
+    if ($scheme_info['term_visibility'] && !$term_visibility_override) {
       $tids = array_merge($tids, _tac_lite_user_tids($user, $i));
       $term_visibility = TRUE;
     }
@@ -707,11 +977,65 @@ function tac_lite_query_term_access_alter(QueryAlterableInterface $query) {
       }
     }
 
-    // Prevent query from finding terms the current user does not have permission to see.
+    // Prevent query from finding terms the current user does not have
+    // permission to see.
     $query->leftJoin('taxonomy_term_data', 'tac_td', $primary_table . '.tid = tac_td.tid');
     $or = db_or();
     $or->condition($primary_table . '.tid', $tids, 'IN');
     $or->condition('tac_td.vocabulary', $selected_vocabularies, 'NOT IN');
     $query->condition($or);
   }
+}
+
+/**
+ * A version of `taxonomy_term_load_children` that avoids causing an infinite
+ * loop and just returns the `tids` rather than full term objects.
+ *
+ * @param int $tid
+ *   A taxonomy term ID.
+ * @param string $vocabulary_name
+ *   An optional vocabulary name to restrict the child search.
+ *
+ * @return array
+ *   An array of term $tids, or an empty array when no children exist.
+ */
+function tac_lite_get_taxonomy_term_children($tid, $vocabulary_name = NULL) {
+  if ($tid) {
+    $query = db_select('taxonomy_term_data', 't');
+    $query->join('taxonomy_term_hierarchy', 'h', 'h.tid = t.tid');
+    $query->addField('t', 'tid');
+    $query->condition('h.parent', $tid);
+    if ($vocabulary_name) {
+      $query->condition('t.vocabulary', $vocabulary_name);
+    }
+    $query->orderBy('t.weight');
+    $query->orderBy('t.name');
+    $tids = $query->execute()->fetchCol();
+  }
+  return isset($tids) ? $tids : array();
+}
+
+/**
+ * A version of `taxonomy_term_load_parents` that avoids causing an infinite
+ * loop and just returns the `tids` rather than full term objects.
+ *
+ * @param int $tid
+ *   A taxonomy term ID.
+ *
+ * @return array
+ *   An array of term $tids, or an empty array when no parents are found.
+ */
+function tac_lite_get_taxonomy_term_parents($tid) {
+
+  if ($tid) {
+    $query = db_select('taxonomy_term_data', 't');
+    $query->join('taxonomy_term_hierarchy', 'h', 'h.parent = t.tid');
+    $query->addField('t', 'tid');
+    $query->condition('h.tid', $tid);
+    $query->orderBy('t.weight');
+    $query->orderBy('t.name');
+    $tids = $query->execute()->fetchCol();
+  }
+
+  return isset($tids) ? $tids : array();
 }

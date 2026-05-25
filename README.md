@@ -31,6 +31,14 @@ Here are some key features of `tac_lite`:
 * Grant permissions per user.  (Give a specific user access beyond
   what his/her roles allow).
 
+* Grant permissions based on a term reference field on the user profile. (If
+  the user has the same term as a node, access is granted.)
+
+* Apply term visibility to form fields so nodes can only be created with
+  allowed terms.
+
+* Grant access to parent terms and/or child terms of the selected terms.
+
 * Supports view, update and delete permissions.
 
 ### Example Use Case: Website to track and share work projects
@@ -76,6 +84,11 @@ see.
 - Now the user can also access the node you created.
 
 ### Notes
+If you are using the Visibility option to limit term visibility in forms and you
+also set 'Term visibility form exceptions' then the terms will be visible if
+that form appears on the page. Therefore, if you have one form you wish to
+restrict terms on and another that you do not wish to restrict terms on you will
+need to display them in separate page requests.
 
 If behavior of this or any other access control module seems to be
 incorrect, try rebuilding the node access table. This may be done
