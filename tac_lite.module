@@ -452,31 +452,8 @@ function tac_lite_get_fields_for_type($entity_type, $bundle, $field_type) {
 function tac_lite_form_alter(&$form, &$form_state, $form_id){
   $config = config('tac_lite.settings');
 
-  // Handle any term visibility form exceptions.
-  // The hook_query_alter() implementation:
-  // (tac_lite_query_alter()) will handle this; we just need that function to
-  // know the form that called it by storing the form_id(s) in the session. We
-  // also send the REQUEST_TIME so we can clear the session variable when the
-  // user leaves the form.
-  if (session_status() !== PHP_SESSION_ACTIVE) {
-    session_start();
-  }
-  if (isset($_SESSION['tac_lite_term_visibility_exceptions']['request_time']) && $_SESSION['tac_lite_term_visibility_exceptions']['request_time'] == REQUEST_TIME) {
-    $_SESSION['tac_lite_term_visibility_exceptions']['form_ids'][] = $form_id;
-  }
-  else {
-    $_SESSION['tac_lite_term_visibility_exceptions'] = array(
-      'request_time' => REQUEST_TIME,
-      'form_ids' => array($form_id),
-    );
-  }
-
-  // Taxonomy reference fields that do not use AJAX are populated with options
-  // before this function is called so we need to repopulate taking into account
-  // any forms with term visibility exceptions.
-  //
-  // First get all the forms that are listed as term visibility exceptions in
-  // all schemes.
+  // Get all the forms that are listed as term visibility exceptions in all
+  // schemes.
   $scheme_term_visibility_exceptions = array();
   for ($i = 1; $i <= $config->get('schemes'); $i++) {
     $scheme_info = _tac_lite_scheme_info($i);
@@ -486,6 +463,27 @@ function tac_lite_form_alter(&$form, &$form_state, $form_id){
 
   // If this form is in the list then proceed.
   if (in_array($form_id, $scheme_term_visibility_exceptions)) {
+    // Handle any term visibility form exceptions.
+    // The hook_query_alter() implementation:
+    // (tac_lite_query_alter()) will handle this; we just need that function to
+    // know the form that called it by storing the form_id(s) in the session. We
+    // also send the REQUEST_TIME so we can clear the session variable when the
+    // user leaves the form.
+    if (session_status() !== PHP_SESSION_ACTIVE) {
+      session_start();
+    }
+    if (isset($_SESSION['tac_lite_term_visibility_exceptions']['request_time']) && $_SESSION['tac_lite_term_visibility_exceptions']['request_time'] == REQUEST_TIME) {
+      $_SESSION['tac_lite_term_visibility_exceptions']['form_ids'][] = $form_id;
+    }
+    else {
+      $_SESSION['tac_lite_term_visibility_exceptions'] = array(
+        'request_time' => REQUEST_TIME,
+        'form_ids' => array($form_id),
+      );
+    }
+    // Taxonomy reference fields that do not use AJAX are populated with options
+    // before this function is called so we need to repopulate taking into
+    // account any forms with term visibility exceptions.
     // Get all taxonomy fields with a widget that does not use AJAX from the
     // form.
     if (isset($form_state['field'])) {
@@ -507,6 +505,11 @@ function tac_lite_form_alter(&$form, &$form_state, $form_id){
         foreach ($fields as $field_name => $field_settings) {
           $existing_options = $form[$field_name]['und']['#options'];
           foreach ($field_settings['vocabularies'] as $key => $vocab_setting) {
+            // If the user has visibility of one or more terms then this static
+            // array will be populated, which will prevent the re-query.
+            // Unsetting for this vocabulary will allow the re-query.
+            $children = &backdrop_static('taxonomy_get_tree', array());
+            unset($children[$vocab_setting['vocabulary']]);
             $terms = taxonomy_get_tree($vocab_setting['vocabulary'], $vocab_setting['parent']);
             foreach ($terms as $term) {
               $options[$term->tid] = $term->name;
