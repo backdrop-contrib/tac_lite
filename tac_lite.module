@@ -463,6 +463,9 @@ function tac_lite_form_alter(&$form, &$form_state, $form_id){
 
   // If this form is in the list then proceed.
   if (in_array($form_id, $scheme_term_visibility_exceptions)) {
+    // Get the form build id so we can check if the form has been submitted with
+    // validation errors.
+    $form_build_id = $form['#build_id'];
     // Handle any term visibility form exceptions.
     // The hook_query_alter() implementation:
     // (tac_lite_query_alter()) will handle this; we just need that function to
@@ -473,12 +476,12 @@ function tac_lite_form_alter(&$form, &$form_state, $form_id){
       session_start();
     }
     if (isset($_SESSION['tac_lite_term_visibility_exceptions']['request_time']) && $_SESSION['tac_lite_term_visibility_exceptions']['request_time'] == REQUEST_TIME) {
-      $_SESSION['tac_lite_term_visibility_exceptions']['form_ids'][] = $form_id;
+      $_SESSION['tac_lite_term_visibility_exceptions']['form_ids'][$form_id] = $form_build_id;
     }
     else {
       $_SESSION['tac_lite_term_visibility_exceptions'] = array(
         'request_time' => REQUEST_TIME,
-        'form_ids' => array($form_id),
+        'form_ids' => array($form_id => $form_build_id),
       );
     }
     // Taxonomy reference fields that do not use AJAX are populated with options
@@ -928,13 +931,26 @@ function tac_lite_query_alter(QueryAlterableInterface $query) {
   // Check if this query is called as part of the same request as the form
   // generated.
   if ($term_visibility_exceptions['request_time'] !== REQUEST_TIME) {
-    // If not, check to see if this is an AJAX request as that indicates a field
-    // on the form and therefore form_id is still valid.
+    // If not, do some further checks:
+    // Check to see if this is an AJAX request as that indicates a field on the
+    // form and therefore form_id is still valid.
     $ajax_request = ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? NULL) === 'XMLHttpRequest';
-    if (!$ajax_request) {
-      // If it is not an AJAX request then this indicates navigation to a
-      // different page so we should clear the session variable and the values
-      // we derived from it.
+    // Check if the form is returned to the user with errors as this will not
+    // have the same request time but the form_id will still be valid.
+    $validation_errors = FALSE;
+    // Get the $_POST form_build_id if it exists.
+    $post_form_build_id = $_POST['form_build_id'] ?? '';
+    $session_form_ids = $term_visibility_exceptions['form_ids'];
+    // Check for matches in the session list of form_ids and form build IDs.
+    foreach ($session_form_ids as $session_form_id => $session_build_id) {
+      if ($post_form_build_id == $session_build_id) {
+        $validation_errors = TRUE;
+      }
+    }
+    if (!$ajax_request && !$validation_errors) {
+      // If it is not an AJAX request or a re-display due to validation errors
+      // then this indicates navigation to a different page so we should clear
+      // the session variable and the values we derived from it.
       unset($_SESSION['tac_lite_term_visibility_exceptions']);
       $term_visibility_exceptions = array(
         'form_ids' => NULL,
@@ -954,7 +970,7 @@ function tac_lite_query_alter(QueryAlterableInterface $query) {
     // Check if the form_ids in the request (or subsequent AJAX request) are
     // listed in a scheme as being an exception to the Visibility rule.
     if (is_array($term_visibility_exceptions['form_ids'])) {
-      foreach ($term_visibility_exceptions['form_ids'] as $form_id) {
+      foreach ($term_visibility_exceptions['form_ids'] as $form_id => $form_build_id) {
         $term_visibility_override = in_array($form_id, $scheme_info['term_visibility_exceptions']);
         if ($term_visibility_override) {
           break;
