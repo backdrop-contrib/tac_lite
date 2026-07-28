@@ -953,7 +953,7 @@ function tac_lite_query_alter(QueryAlterableInterface $query) {
       // the session variable and the values we derived from it.
       unset($_SESSION['tac_lite_term_visibility_exceptions']);
       $term_visibility_exceptions = array(
-        'form_ids' => NULL,
+        'form_ids' => array(),
         'request_time' => NULL,
       );
     }
