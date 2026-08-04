@@ -925,7 +925,7 @@ function tac_lite_query_alter(QueryAlterableInterface $query) {
   // Check for the session variable.
   if (session_status() !== PHP_SESSION_ACTIVE) session_start();
   $term_visibility_exceptions = $_SESSION['tac_lite_term_visibility_exceptions'] ?? array(
-    'form_ids' => NULL,
+    'form_ids' => array(),
     'request_time' => NULL,
   );
   // Check if this query is called as part of the same request as the form
