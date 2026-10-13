@@ -217,7 +217,7 @@ function tac_lite_admin_scheme_form($form, $form_state, $i) {
   $config = config('tac_lite.settings');
   $selected_vocabularies = $config->get('categories');
   $roles = user_roles();
-
+  $user_term_ref_fields = tac_lite_get_fields_for_type('user', 'user', 'taxonomy_term_reference');
   $scheme_info = _tac_lite_scheme_info($i);
   $form['#tac_lite_scheme_info'] = $scheme_info;
   $form['#tac_lite_scheme_id'] = $i;
@@ -302,7 +302,7 @@ function tac_lite_admin_scheme_form($form, $form_state, $i) {
     $form['config_scheme_' . $i]['user_terms_field'] = array(
       '#type' => 'select',
       '#title' => t("Term reference field"),
-      '#options' => tac_lite_get_fields_for_type('user', 'user', 'taxonomy_term_reference'),
+      '#options' => $user_term_ref_fields,
       '#default_value' => $scheme_info['user_terms_field'],
       '#states' => array(
         'visible' => array(
@@ -313,6 +313,14 @@ function tac_lite_admin_scheme_form($form, $form_state, $i) {
       '#suffix' => '</p>',
     );
 
+    // If no term reference field has been added to the user account entity,
+    // disable the option, provide a description and set values accordingly.
+    if (empty($user_term_ref_fields)) {
+      $form['config_scheme_' . $i]['user_terms']['#disabled'] = TRUE;
+      $form['config_scheme_' . $i]['user_terms']['#default_value'] = FALSE;
+      $form['config_scheme_' . $i]['user_terms']['#description'] = t('Add at least one term reference field to User accounts to use this option.');
+      $form['config_scheme_' . $i]['user_terms_field']['#default_value'] = NULL;
+    }
     $form['helptext'] = array(
       '#type' => 'markup',
       '#markup' => t('To grant to an individual user, visit the <em>access by taxonomy</em> tab on the account edit page.'),
@@ -425,10 +433,12 @@ function tac_lite_admin_scheme_form_submit($form, &$form_state) {
  *   The field type.
  *
  * @return array
- *   An array of all fields of the selected type.
+ *   An array of all fields of the selected type or an empty array if no fields
+ *   exist on the entity bundle.
  */
 function tac_lite_get_fields_for_type($entity_type, $bundle, $field_type) {
   $instances = field_info_instances($entity_type, $bundle);
+  $fields = array();
   foreach ($instances as $instance) {
     $field_info = field_info_field($instance['field_name']);
     if ($field_info['type'] == $field_type) {
